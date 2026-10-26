@@ -15,7 +15,7 @@ namespace
 
 Curve::Curve()
 {
-    setPoints (preset (0));
+    setPoints (preset (duck));
 }
 
 void Curve::setPoints (std::vector<CurvePoint> newPoints)
@@ -113,28 +113,74 @@ void Curve::fromValueTree (const juce::ValueTree& tree)
     setPoints (std::move (loaded));
 }
 
-juce::StringArray Curve::presetNames()
+void Curve::invert()
 {
-    return { "Duck", "Pump", "Ramp Up", "Gate 1/2", "Sine", "Flat" };
+    for (auto& p : points)
+        p.y = 1.0f - p.y;
+
+    setPoints (points);
 }
 
-std::vector<CurvePoint> Curve::preset (int index)
+void Curve::reverse()
 {
-    switch (index)
+    // Walking a segment backwards bends it the other way.
+    std::vector<CurvePoint> reversed;
+
+    for (size_t i = points.size(); i-- > 0;)
+        reversed.push_back ({ 1.0f - points[i].x, points[i].y, i > 0 ? -points[i - 1].tension : 0.0f });
+
+    setPoints (std::move (reversed));
+}
+
+juce::StringArray Curve::presetNames()
+{
+    return { "Duck", "Pump", "Ramp Up", "Ramp Down", "Triangle", "Sine", "Square", "Trance Gate", "Flat (Top)", "Flat (Centre)" };
+}
+
+std::vector<CurvePoint> Curve::gate (const juce::String& pattern, float high, float low)
+{
+    constexpr float edge = 0.002f;
+    const auto steps = juce::jmax (1, pattern.length());
+    std::vector<CurvePoint> result;
+
+    for (int i = 0; i < steps; ++i)
     {
-        case 0: // Duck: classic sidechain dip
+        const auto value = pattern[i] == 'x' ? high : low;
+        const auto start = (float) i / (float) steps;
+        const auto end = (float) (i + 1) / (float) steps;
+
+        result.push_back ({ i == 0 ? 0.0f : start, value, 0.0f });
+        result.push_back ({ end - edge, value, 0.0f });
+    }
+
+    result.push_back ({ 1.0f, result.front().y, 0.0f });
+    return result;
+}
+
+std::vector<CurvePoint> Curve::preset (int shape)
+{
+    switch (shape)
+    {
+        case duck: // classic sidechain dip
             return { { 0.0f, 0.0f, -0.6f }, { 0.35f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
-        case 1: // Pump: smoother, longer recovery
+        case pump: // smoother, longer recovery
             return { { 0.0f, 0.15f, -0.35f }, { 0.6f, 1.0f, 0.0f }, { 0.9f, 1.0f, 0.5f }, { 1.0f, 0.15f, 0.0f } };
-        case 2: // Ramp up
+        case rampUp:
             return { { 0.0f, 0.0f, 0.3f }, { 0.97f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
-        case 3: // Gate on the first half
-            return { { 0.0f, 1.0f, 0.0f }, { 0.48f, 1.0f, 0.0f }, { 0.5f, 0.0f, 0.0f },
-                     { 0.98f, 0.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
-        case 4: // Sine-ish
+        case rampDown:
+            return { { 0.0f, 1.0f, -0.3f }, { 0.97f, 0.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
+        case triangle:
+            return { { 0.0f, 0.0f, 0.0f }, { 0.5f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+        case sine:
             return { { 0.0f, 0.5f, -0.4f }, { 0.25f, 1.0f, 0.4f }, { 0.5f, 0.5f, -0.4f },
                      { 0.75f, 0.0f, 0.4f }, { 1.0f, 0.5f, 0.0f } };
-        default: // Flat
+        case square:
+            return gate ("xx..");
+        case tranceGate:
+            return gate ("x.xxx.x.xx.xx.x.");
+        case flatCentre:
+            return { { 0.0f, 0.5f, 0.0f }, { 1.0f, 0.5f, 0.0f } };
+        default: // flatTop
             return { { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
     }
 }

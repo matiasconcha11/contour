@@ -19,6 +19,21 @@ class Curve
 public:
     static constexpr int tableSize = 2048;
 
+    enum Shape
+    {
+        duck,
+        pump,
+        rampUp,
+        rampDown,
+        triangle,
+        sine,
+        square,
+        tranceGate,
+        flatTop,
+        flatCentre,
+        numShapes
+    };
+
     Curve();
 
     // Message thread only.
@@ -26,14 +41,20 @@ public:
     void setPoints (std::vector<CurvePoint> newPoints);
     float evaluate (float x) const; // exact evaluation, used for drawing
 
+    void invert();
+    void reverse();
+
     juce::ValueTree toValueTree() const;
     void fromValueTree (const juce::ValueTree& tree);
 
     // Audio thread safe: reads the lookup table built from the points.
     float lookup (float phase) const noexcept;
 
-    static std::vector<CurvePoint> preset (int index);
+    static std::vector<CurvePoint> preset (int shape);
     static juce::StringArray presetNames();
+
+    // Square steps from a pattern such as "x.x.xx.x": 'x' is high, anything else low.
+    static std::vector<CurvePoint> gate (const juce::String& pattern, float high = 1.0f, float low = 0.0f);
 
 private:
     void sanitise();

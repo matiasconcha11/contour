@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Curve.h"
+#include <array>
 
 // Interactive editor for a Curve.
 //   drag point        move it (edge points move vertically, and stay linked)
@@ -12,12 +13,18 @@
 class CurveEditor : public juce::Component
 {
 public:
-    explicit CurveEditor (Curve& curveToEdit);
+    static constexpr int waveformBins = 256;
+    using Waveform = std::array<std::atomic<float>, waveformBins>;
+
+    CurveEditor (Curve& curveToEdit, const Waveform& input, const Waveform& output);
 
     std::function<void()> onChange;
 
+    void setCurve (Curve& curveToEdit, juce::Colour accent, bool showCentreLine);
+    void setActive (bool isActive);
     void setPlayhead (float phase);
     void setGridDivisions (int divisions);
+    int getGridDivisions() const { return gridDivisions; }
 
     void paint (juce::Graphics&) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -36,7 +43,12 @@ private:
     float snapX (float x, const juce::ModifierKeys& mods) const;
     void commit (std::vector<CurvePoint> points);
 
-    Curve& curve;
+    Curve* curve;
+    const Waveform& waveIn;
+    const Waveform& waveOut;
+    juce::Colour accent { 0xffffb347 };
+    bool centreLine = false;
+    bool active = true;
     float playhead = -1.0f;
     int gridDivisions = 16;
 

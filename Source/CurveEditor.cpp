@@ -1,13 +1,13 @@
 #include "CurveEditor.h"
+#include "LookAndFeel.h"
 
 namespace Colours
 {
-    const juce::Colour background { 0xff15161a };
-    const juce::Colour gridMinor { 0xff1f2127 };
-    const juce::Colour gridMajor { 0xff2c2f38 };
-    const juce::Colour curve { 0xffffb347 };
-    const juce::Colour point { 0xfff4f1ea };
-    const juce::Colour playhead { 0xff7fd1c7 };
+    const juce::Colour background { 0xff101115 };
+    const juce::Colour gridMinor { 0xff191b20 };
+    const juce::Colour gridMajor { 0xff252830 };
+    const juce::Colour point = Theme::text;
+    const juce::Colour playhead = Theme::text;
 }
 
 namespace
@@ -16,18 +16,32 @@ namespace
     constexpr float hitRadius = 9.0f;
 }
 
-CurveEditor::CurveEditor (Curve& curveToEdit) : curve (curveToEdit)
+CurveEditor::CurveEditor (Curve& curveToEdit, const Waveform& input, const Waveform& output)
+    : curve (&curveToEdit), waveIn (input), waveOut (output)
 {
     setRepaintsOnMouseActivity (false);
 }
 
+void CurveEditor::setCurve (Curve& curveToEdit, juce::Colour newAccent, bool showCentreLine)
+{
+    curve = &curveToEdit;
+    accent = newAccent;
+    centreLine = showCentreLine;
+    hoverPoint = dragPoint = bendSegment = -1;
+    repaint();
+}
+
+void CurveEditor::setActive (bool isActive)
+{
+    active = isActive;
+    repaint();
+}
+
 void CurveEditor::setPlayhead (float phase)
 {
-    if (std::abs (phase - playhead) > 1.0e-4f)
-    {
-        playhead = phase;
-        repaint();
-    }
+    // Repaint every frame: the waveform behind the curve keeps changing.
+    playhead = phase;
+    repaint();
 }
 
 void CurveEditor::setGridDivisions (int divisions)
@@ -56,7 +70,7 @@ juce::Point<float> CurveEditor::toCurve (juce::Point<float> screen) const
 
 int CurveEditor::pointAt (juce::Point<float> screen) const
 {
-    const auto& points = curve.getPoints();
+    const auto& points = curve->getPoints();
 
     // The last point mirrors the first, so it is only grabbable on its own side.
     for (int i = (int) points.size() - 1; i >= 0; --i)
@@ -68,7 +82,7 @@ int CurveEditor::pointAt (juce::Point<float> screen) const
 
 int CurveEditor::segmentAt (float curveX) const
 {
-    const auto& points = curve.getPoints();
+    const auto& points = curve->getPoints();
 
     for (size_t i = 0; i + 1 < points.size(); ++i)
         if (curveX <= points[i + 1].x)
@@ -87,7 +101,7 @@ float CurveEditor::snapX (float x, const juce::ModifierKeys& mods) const
 
 void CurveEditor::commit (std::vector<CurvePoint> points)
 {
-    curve.setPoints (std::move (points));
+    curve->setPoints (std::move (points));
     repaint();
 
     if (onChange)
@@ -97,8 +111,10 @@ void CurveEditor::commit (std::vector<CurvePoint> points)
 void CurveEditor::paint (juce::Graphics& g)
 {
     const auto area = plotArea();
+    const auto colour = active ? accent : Theme::faint;
 
-    g.fillAll (Colours::background);
+    g.setColour (Colours::background);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
 
     for (int i = 0; i <= gridDivisions; ++i)
     {
@@ -115,13 +131,36 @@ void CurveEditor::paint (juce::Graphics& g)
                               area.getX(), area.getRight());
     }
 
+    if (centreLine)
+    {
+        g.setColour (Theme::faint);
+        const auto y = area.getCentreY();
+        const float dashes[] { 4.0f, 4.0f };
+        g.drawDashedLine ({ area.getX(), y, area.getRight(), y }, dashes, 2, 1.0f);
+    }
+
+    // Audio over one cycle: input as a dim silhouette, output in the module colour.
+    const auto binWidth = area.getWidth() / (float) waveformBins;
+
+    for (int i = 0; i < waveformBins; ++i)
+    {
+        const auto x = area.getX() + (float) i * binWidth;
+        const auto in = std::sqrt (juce::jlimit (0.0f, 1.0f, waveIn[(size_t) i].load (std::memory_order_relaxed)));
+        const auto out = std::sqrt (juce::jlimit (0.0f, 1.0f, waveOut[(size_t) i].load (std::memory_order_relaxed)));
+
+        g.setColour (Theme::text.withAlpha (0.06f));
+        g.fillRect (x, area.getBottom() - in * area.getHeight(), binWidth, in * area.getHeight());
+        g.setColour (colour.withAlpha (0.22f));
+        g.fillRect (x, area.getBottom() - out * area.getHeight(), binWidth, out * area.getHeight());
+    }
+
     juce::Path line;
     const auto steps = juce::jmax (2, (int) area.getWidth());
 
     for (int i = 0; i <= steps; ++i)
     {
         const auto x = (float) i / (float) steps;
-        const auto p = toScreen (x, curve.evaluate (x));
+        const auto p = toScreen (x, curve->evaluate (x));
 
         if (i == 0)
             line.startNewSubPath (p);
@@ -134,33 +173,37 @@ void CurveEditor::paint (juce::Graphics& g)
     fill.lineTo (area.getBottomLeft());
     fill.closeSubPath();
 
-    g.setGradientFill (juce::ColourGradient (Colours::curve.withAlpha (0.35f), area.getTopLeft(),
-                                             Colours::curve.withAlpha (0.03f), area.getBottomLeft(), false));
+    g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.28f), area.getTopLeft(),
+                                             colour.withAlpha (0.02f), area.getBottomLeft(), false));
     g.fillPath (fill);
 
-    g.setColour (Colours::curve);
+    g.setColour (colour.withAlpha (0.25f));
+    g.strokePath (line, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (colour);
     g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     if (playhead >= 0.0f)
     {
-        const auto head = toScreen (playhead, curve.evaluate (playhead));
-        g.setColour (Colours::playhead.withAlpha (0.5f));
+        const auto head = toScreen (playhead, curve->evaluate (playhead));
+        g.setColour (Colours::playhead.withAlpha (0.25f));
         g.drawVerticalLine (juce::roundToInt (head.x), area.getY(), area.getBottom());
+        g.setColour (colour.withAlpha (0.35f));
+        g.fillEllipse (juce::Rectangle<float> (14.0f, 14.0f).withCentre (head));
         g.setColour (Colours::playhead);
-        g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (head));
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (head));
     }
 
-    const auto& points = curve.getPoints();
+    const auto& points = curve->getPoints();
 
     for (size_t i = 0; i < points.size(); ++i)
     {
         const auto centre = toScreen (points[i].x, points[i].y);
-        const auto active = (int) i == hoverPoint || (int) i == dragPoint;
-        const auto radius = active ? pointRadius + 1.5f : pointRadius;
+        const auto isActive = (int) i == hoverPoint || (int) i == dragPoint;
+        const auto radius = isActive ? pointRadius + 1.5f : pointRadius;
 
         g.setColour (Colours::background);
         g.fillEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre));
-        g.setColour (active ? Colours::curve : Colours::point);
+        g.setColour (isActive ? colour : Colours::point);
         g.drawEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre), 2.0f);
     }
 }
@@ -190,7 +233,7 @@ void CurveEditor::mouseDown (const juce::MouseEvent& e)
     dragPoint = pointAt (e.position);
     bendSegment = -1;
 
-    const auto& points = curve.getPoints();
+    const auto& points = curve->getPoints();
     const auto lastIndex = (int) points.size() - 1;
 
     if (e.mods.isPopupMenu())
@@ -216,7 +259,7 @@ void CurveEditor::mouseDown (const juce::MouseEvent& e)
 
 void CurveEditor::mouseDrag (const juce::MouseEvent& e)
 {
-    auto points = curve.getPoints();
+    auto points = curve->getPoints();
     const auto lastIndex = (int) points.size() - 1;
 
     if (dragPoint >= 0)
@@ -261,7 +304,7 @@ void CurveEditor::mouseUp (const juce::MouseEvent&)
 
 void CurveEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    auto points = curve.getPoints();
+    auto points = curve->getPoints();
     const auto hit = pointAt (e.position);
 
     if (hit > 0 && hit < (int) points.size() - 1)

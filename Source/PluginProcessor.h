@@ -2,16 +2,22 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Curve.h"
+#include "Parameters.h"
 
-class ContourProcessor : public juce::AudioProcessor
+class ContourProcessor : public juce::AudioProcessor,
+                         private juce::AudioProcessorParameter::Listener
 {
 public:
+    static constexpr int waveformBins = 256;
+
     ContourProcessor();
+    ~ContourProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    juce::AudioProcessorParameter* getBypassParameter() const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -30,30 +36,73 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // Message thread: call after editing the curve so the host marks the session dirty.
+    // Full state (parameters + curves + preset name) as a tree. Message thread only.
+    juce::ValueTree getStateTree();
+    void setStateTree (const juce::ValueTree& state);
+
+    // Message thread: call after editing a curve so the host and preset bar know.
     void curveChanged();
 
-    static juce::StringArray rateNames();
+    // Preset bookkeeping, owned by the message thread.
+    juce::String presetName { "Init" };
+    bool isPresetDirty() const { return presetDirty.load(); }
+    void markPresetClean() { presetDirty = false; }
+
+    // Suppresses dirty tracking while a preset is being applied.
+    struct ScopedPresetLoad
+    {
+        explicit ScopedPresetLoad (ContourProcessor& p) : processor (p) { processor.loadingPreset = true; }
+        ~ScopedPresetLoad() { processor.loadingPreset = false; processor.presetDirty = false; }
+        ContourProcessor& processor;
+    };
 
     juce::AudioProcessorValueTreeState apvts;
-    Curve curve;
+    std::array<Curve, Params::numModules> curves;
 
-    // Written by the audio thread, read by the editor for the playhead.
+    // Written by the audio thread, read by the editor.
     std::atomic<float> displayPhase { 0.0f };
-    std::atomic<float> displayGain { 1.0f };
+    std::array<std::atomic<float>, waveformBins> waveIn {};
+    std::array<std::atomic<float>, waveformBins> waveOut {};
 
 private:
-    static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
-    static double beatsPerCycle (int rateIndex);
+    void applyParameterState (const juce::ValueTree&);
+    void applyCurveState (const juce::ValueTree&);
 
+    void parameterValueChanged (int parameterIndex, float newValue) override;
+    void parameterGestureChanged (int, bool) override {}
+
+    struct ModuleParams
+    {
+        std::atomic<float>* on = nullptr;
+        std::atomic<float>* depth = nullptr;
+    };
+
+    std::array<ModuleParams, Params::numModules> moduleParams;
     std::atomic<float>* rateParam = nullptr;
-    std::atomic<float>* depthParam = nullptr;
-    std::atomic<float>* smoothParam = nullptr;
+    std::atomic<float>* rateHzParam = nullptr;
+    std::atomic<float>* syncParam = nullptr;
     std::atomic<float>* offsetParam = nullptr;
+    std::atomic<float>* smoothParam = nullptr;
+    std::atomic<float>* mixParam = nullptr;
+    std::atomic<float>* inputGainParam = nullptr;
+    std::atomic<float>* outputGainParam = nullptr;
+    std::atomic<float>* bypassParam = nullptr;
 
     double currentSampleRate = 44100.0;
     double freeRunPpq = 0.0;
+    double hzPhase = 0.0;
+
+    // Per-module modulation values after click smoothing.
     float smoothedGain = 1.0f;
+    float smoothedPan = 0.0f;
+    float smoothedWidth = 1.0f;
+    juce::SmoothedValue<float> mixSmoothed, inputGainSmoothed, outputGainSmoothed;
+
+    int waveBin = 0;
+    float waveInPeak = 0.0f, waveOutPeak = 0.0f;
+
+    std::atomic<bool> presetDirty { false };
+    std::atomic<bool> loadingPreset { false };
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (ContourProcessor)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ContourProcessor)

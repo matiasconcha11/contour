@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Contour VERSION 0.1.0)
+project(Contour VERSION 0.2.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,11 +27,17 @@ juce_add_plugin(Contour
     NEEDS_MIDI_OUTPUT FALSE
     COPY_PLUGIN_AFTER_BUILD TRUE)
 
-target_sources(Contour PRIVATE
+set(CONTOUR_SOURCES
     Source/Curve.cpp
     Source/CurveEditor.cpp
+    Source/LookAndFeel.cpp
+    Source/Parameters.cpp
     Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp)
+    Source/PluginEditor.cpp
+    Source/PresetManager.cpp)
+
+target_sources(Contour PRIVATE ${CONTOUR_SOURCES})
+target_compile_definitions(Contour PRIVATE CONTOUR_VERSION="${PROJECT_VERSION}")
 
 target_compile_definitions(Contour PUBLIC
     JUCE_WEB_BROWSER=0
@@ -59,11 +65,9 @@ if(CONTOUR_BUILD_TESTS)
 
     # The tests compile the same sources as the plugin, without a plugin wrapper around them.
     add_executable(ContourTests
-        Source/Curve.cpp
-        Source/CurveEditor.cpp
-        Source/PluginProcessor.cpp
-        Source/PluginEditor.cpp
+        ${CONTOUR_SOURCES}
         Tests/CurveTests.cpp
+        Tests/PresetTests.cpp
         Tests/ProcessorTests.cpp)
 
     target_link_libraries(ContourTests PRIVATE
@@ -74,6 +78,7 @@ if(CONTOUR_BUILD_TESTS)
 
     target_include_directories(ContourTests PRIVATE Source)
     target_compile_definitions(ContourTests PRIVATE
+        CONTOUR_VERSION="${PROJECT_VERSION}"
         JUCE_STANDALONE_APPLICATION=1
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0)
