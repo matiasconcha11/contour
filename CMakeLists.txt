@@ -1,0 +1,48 @@
+cmake_minimum_required(VERSION 3.22)
+
+project(Contour VERSION 0.1.0)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
+
+include(FetchContent)
+FetchContent_Declare(
+    JUCE
+    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+    GIT_TAG        9.0.4
+    GIT_SHALLOW    TRUE)
+FetchContent_MakeAvailable(JUCE)
+
+juce_add_plugin(Contour
+    COMPANY_NAME "Matias Concha"
+    BUNDLE_ID com.matiasconcha.contour
+    PLUGIN_MANUFACTURER_CODE Mcon
+    PLUGIN_CODE Cntr
+    FORMATS AU VST3 Standalone
+    PRODUCT_NAME "Contour"
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+    COPY_PLUGIN_AFTER_BUILD TRUE)
+
+target_sources(Contour PRIVATE
+    Source/Curve.cpp
+    Source/CurveEditor.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp)
+
+target_compile_definitions(Contour PUBLIC
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0)
+
+target_link_libraries(Contour
+    PRIVATE
+        juce::juce_audio_utils
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
