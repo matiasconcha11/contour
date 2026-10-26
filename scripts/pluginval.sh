@@ -21,7 +21,12 @@ fi
 config="$(sed -n 's/^CMAKE_BUILD_TYPE:STRING=//p' "$build/CMakeCache.txt")"
 artefacts="$build/Contour_artefacts/${config:-Release}"
 
-for plugin in "$artefacts/VST3/Contour.vst3" "$artefacts/AU/Contour.component"; do
+# macOS only finds AUs through its component registry, so validate the installed copy
+# and make the registrar rescan (a fresh CI machine has never seen this plugin).
+killall -9 AudioComponentRegistrar 2>/dev/null || true
+auval -v aufx Cntr Mcon >/dev/null 2>&1 || true
+
+for plugin in "$artefacts/VST3/Contour.vst3" "$HOME/Library/Audio/Plug-Ins/Components/Contour.component"; do
     echo "==> pluginval (strictness $strictness): $(basename "$plugin")"
     "$bin" --strictness-level "$strictness" --validate-in-process --skip-gui-tests \
         --output-dir "$build/pluginval" --validate "$plugin"
