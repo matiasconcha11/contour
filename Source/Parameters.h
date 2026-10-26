@@ -65,5 +65,8 @@ namespace Params
     // Length of one cycle in quarter notes; bar-based rates follow the host's time signature.
     double beatsPerCycle (int rateIndex, double beatsPerBar);
 
+    // Number of bars in one cycle for bar-based rates ("1 bar", "2 bars"...), 0 for note values.
+    int barsPerCycle (int rateIndex);
+
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 }

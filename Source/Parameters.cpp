@@ -107,6 +107,12 @@ namespace Params
         return r.beats > 0.0 ? r.beats : -r.beats * beatsPerBar;
     }
 
+    int barsPerCycle (int rateIndex)
+    {
+        const auto& r = rates[juce::jlimit (0, (int) std::size (rates) - 1, rateIndex)];
+        return r.beats < 0.0 ? (int) -r.beats : 0;
+    }
+
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     {
         using namespace juce;

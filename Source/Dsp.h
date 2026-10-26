@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -47,6 +48,18 @@ namespace Dsp
         }
 
         int maxDelay() const { return (int) buffer.size() - 2; }
+
+        // Silences the most recent `numSamples`, i.e. everything a read up to that delay could reach.
+        void clearRecent (int numSamples)
+        {
+            const auto size = (int) buffer.size();
+
+            for (int i = 0, index = writeIndex; i < juce::jmin (numSamples, size); ++i)
+            {
+                index = index == 0 ? size - 1 : index - 1;
+                buffer[(size_t) index] = 0.0f;
+            }
+        }
 
         void push (float sample)
         {

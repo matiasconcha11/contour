@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 
 #include <cmath>
+#include <optional>
 
 namespace
 {
@@ -133,6 +134,7 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     double beatsPerBar = 4.0;
     bool hasHost = false;
     bool hostPlaying = false;
+    std::optional<double> lastBarStart;
 
     if (auto* playHead = getPlayHead())
     {
@@ -150,19 +152,28 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
             {
                 tempoPpq = *hostPpq;
                 hostPlaying = true;
+
+                if (auto barStart = position->getPpqPositionOfLastBarStart())
+                    lastBarStart = *barStart;
             }
         }
     }
 
     const auto numSamples = buffer.getNumSamples();
+    const auto ppqPerSample = bpm / 60.0 / currentSampleRate;
+
+    const auto transportJumped = hostPlaying && (! hostWasPlaying || std::abs (tempoPpq - expectedHostPpq) > 0.01);
+    hostWasPlaying = hostPlaying;
+    expectedHostPpq = tempoPpq + numSamples * ppqPerSample;
+
     const auto stereo = getTotalNumOutputChannels() > 1;
     auto* left = buffer.getWritePointer (0);
     auto* right = stereo ? buffer.getWritePointer (1) : nullptr;
 
     // Clock: phase of the first sample and the per-sample increment, in cycles.
     const auto mode = (int) modeParam->load();
-    const auto cycleBeats = Params::beatsPerCycle ((int) rateParam->load(), beatsPerBar);
-    const auto ppqPerSample = bpm / 60.0 / currentSampleRate;
+    const auto rateIndex = (int) rateParam->load();
+    const auto cycleBeats = Params::beatsPerCycle (rateIndex, beatsPerBar);
     const auto cycleSamples = mode == Params::hzMode ? currentSampleRate / rateHzParam->load()
                                                      : cycleBeats / ppqPerSample;
 
@@ -170,9 +181,24 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     // Without a host (the standalone app) it runs at 120 bpm.
     const auto tempoRunning = hostPlaying || ! hasHost;
     auto phaseAcc = mode == Params::tempoMode ? tempoPpq / cycleBeats : freePhase;
+
+    // Bar-based rates count bars rather than beats, so cycles start on bar lines even after a
+    // time-signature change. AU and VST3 hosts report where the current bar started but not its
+    // number, so the bar number is estimated in the current signature (exact if it never changes).
+    if (const auto bars = Params::barsPerCycle (rateIndex); mode == Params::tempoMode && bars > 0 && lastBarStart)
+    {
+        const auto barNumber = std::round (*lastBarStart / beatsPerBar);
+        phaseAcc = (barNumber + (tempoPpq - *lastBarStart) / beatsPerBar) / bars;
+    }
     const auto phaseIncrement = mode == Params::tempoMode ? (tempoRunning ? 1.0 / cycleSamples : 0.0)
                                                           : 1.0 / cycleSamples;
     const auto offset = (double) offsetParam->load();
+
+    // Playback started or jumped: audio from before is no longer "the recent past" for the Time
+    // module. It never reads back more than one cycle, so only that much needs silencing.
+    if (transportJumped)
+        for (auto& d : delays)
+            d.clearRecent ((int) cycleSamples + 2);
 
     // Audio trigger: restart the cycle when the input crosses the threshold.
     const auto audioTrigger = mode == Params::audioMode;

@@ -230,3 +230,105 @@ TEST_CASE_METHOD (Fixture, "Sessions from version 0.2 keep their sync setting", 
 
     CHECK ((int) processor.apvts.getRawParameterValue (Params::mode)->load() == Params::hzMode);
 }
+
+TEST_CASE_METHOD (Fixture, "Bar rates start on bar lines after a time-signature change", "[transport]")
+{
+    // Two bars of 3/4 (6 beats), then 4/4: bar 3 starts at beat 6, which isn't a multiple of 4.
+    TestPlayHead host;
+    host.info.setBpm (120.0);
+    host.info.setIsPlaying (true);
+    host.info.setTimeSignature (juce::AudioPlayHead::TimeSignature { 4, 4 });
+    host.info.setPpqPosition (6.0);
+    host.info.setPpqPositionOfLastBarStart (6.0);
+    processor.setPlayHead (&host);
+
+    set (Params::rate, (float) Params::rateNames().indexOf ("1 bar"));
+    set (Params::offset, 0.0f);
+
+    // Read the phase at the very first sample: process a single-sample block.
+    juce::AudioBuffer<float> buffer (2, 1);
+    juce::MidiBuffer midi;
+    buffer.clear();
+    processor.processBlock (buffer, midi);
+
+    // Counting beats would put this half-way through a bar (6 / 4 = 1.5).
+    CHECK_THAT (processor.displayPhase.load(), WithinAbs (0.0f, 1.0e-4));
+}
+
+TEST_CASE_METHOD (Fixture, "Multi-bar rates pick up mid-cycle when starting later in the song", "[transport]")
+{
+    // Starting at bar 2 in 4/4 with a 4-bar cycle: a quarter of the way through.
+    TestPlayHead host;
+    host.info.setBpm (120.0);
+    host.info.setIsPlaying (true);
+    host.info.setTimeSignature (juce::AudioPlayHead::TimeSignature { 4, 4 });
+    host.info.setPpqPosition (4.0);
+    host.info.setPpqPositionOfLastBarStart (4.0);
+    processor.setPlayHead (&host);
+
+    set (Params::rate, (float) Params::rateNames().indexOf ("4 bars"));
+
+    juce::AudioBuffer<float> buffer (2, 1);
+    juce::MidiBuffer midi;
+    buffer.clear();
+    processor.processBlock (buffer, midi);
+
+    CHECK_THAT (processor.displayPhase.load(), WithinAbs (0.25f, 1.0e-4));
+}
+
+TEST_CASE_METHOD (Fixture, "Time module forgets old audio when playback jumps", "[transport]")
+{
+    TestPlayHead host;
+    host.info.setBpm (120.0);
+    host.info.setIsPlaying (true);
+    host.info.setPpqPosition (40.0);
+    processor.setPlayHead (&host);
+    solo (Params::time, 0.5f); // reads half a 1/4 cycle back: 12000 samples
+
+    // Play an impulse around bar 11...
+    run (1, [] (int n) { return n == 100 ? 1.0f : 0.0f; });
+
+    // ...then jump back to the start of the song and play silence.
+    juce::AudioBuffer<float> buffer (2, blockSize);
+    juce::MidiBuffer midi;
+    auto loudest = 0.0f;
+
+    for (int b = 0; b < 40; ++b)
+    {
+        host.info.setPpqPosition (b * blockSize / 24000.0);
+        buffer.clear();
+        processor.processBlock (buffer, midi);
+        loudest = juce::jmax (loudest, buffer.getMagnitude (0, 0, blockSize));
+    }
+
+    CHECK (loudest < 1.0e-6f); // without clearing, the impulse would come back 12000 samples later
+}
+
+TEST_CASE_METHOD (Fixture, "Time module keeps its memory during normal playback", "[transport]")
+{
+    TestPlayHead host;
+    host.info.setBpm (120.0);
+    host.info.setIsPlaying (true);
+    processor.setPlayHead (&host);
+    solo (Params::time, 0.5f);
+
+    juce::AudioBuffer<float> buffer (2, blockSize);
+    juce::MidiBuffer midi;
+    auto echoed = 0.0f;
+
+    for (int b = 0; b < 40; ++b)
+    {
+        host.info.setPpqPosition (b * blockSize / 24000.0);
+        buffer.clear();
+
+        if (b == 0)
+            buffer.setSample (0, 100, 1.0f);
+
+        processor.processBlock (buffer, midi);
+
+        if (b > 0)
+            echoed = juce::jmax (echoed, buffer.getMagnitude (0, 0, blockSize));
+    }
+
+    CHECK_THAT (echoed, WithinAbs (1.0f, 1.0e-4));
+}

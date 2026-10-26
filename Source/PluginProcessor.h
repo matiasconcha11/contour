@@ -103,6 +103,10 @@ private:
     double tempoPpq = 0.0;
     double freePhase = 0.0;
 
+    // Where the host's transport should be at the next block if it keeps playing; a mismatch is a jump.
+    double expectedHostPpq = 0.0;
+    bool hostWasPlaying = false;
+
     // Audio trigger detection.
     float triggerEnvelope = 0.0f;
     bool triggerArmed = true;
