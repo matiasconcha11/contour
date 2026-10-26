@@ -23,8 +23,8 @@ jobs:
       - name: Package
         run: |
           cd build/Contour_artefacts/Release
-          ditto -c -k --keepParent AU/Contour.component "$GITHUB_WORKSPACE/Contour-${GITHUB_REF_NAME}-macOS-AU.zip"
-          ditto -c -k --keepParent VST3/Contour.vst3 "$GITHUB_WORKSPACE/Contour-${GITHUB_REF_NAME}-macOS-VST3.zip"
+          ditto -c -k --keepParent AU/Contour.component "$GITHUB_WORKSPACE/Contour-macOS-AU.zip"
+          ditto -c -k --keepParent VST3/Contour.vst3 "$GITHUB_WORKSPACE/Contour-macOS-VST3.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -40,7 +40,7 @@ jobs:
           cmake --build build --config Release --parallel
       - name: Package
         shell: pwsh
-        run: Compress-Archive -Path build/Contour_artefacts/Release/VST3/Contour.vst3 -DestinationPath "Contour-$env:GITHUB_REF_NAME-Windows-VST3.zip"
+        run: Compress-Archive -Path build/Contour_artefacts/Release/VST3/Contour.vst3 -DestinationPath "Contour-Windows-VST3.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
