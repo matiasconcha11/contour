@@ -20,7 +20,11 @@ public:
 
     std::function<void()> onChange;
 
+    // Bracket each user gesture (drag, double-click, delete) so it can become one undo step.
+    std::function<void()> onEditStart, onEditEnd;
+
     void setCurve (Curve& curveToEdit, juce::Colour accent, bool showCentreLine);
+    void setCaption (const juce::String& title, const juce::String& hint);
     void setActive (bool isActive);
     void setPlayhead (float phase);
     void setGridDivisions (int divisions);
@@ -48,6 +52,7 @@ private:
     const Waveform& waveOut;
     juce::Colour accent { 0xffffb347 };
     bool centreLine = false;
+    juce::String captionTitle, captionHint;
     bool active = true;
     float playhead = -1.0f;
     int gridDivisions = 16;

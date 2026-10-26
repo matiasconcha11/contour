@@ -187,7 +187,7 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
     presets.load (juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_PRESET", "0").getIntValue());
 
     std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
-    editor->setSize (920, 600);
+    editor->setSize (1060, 700);
 
     const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 2.0f);
     const auto path = juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT", "/tmp/contour.png");

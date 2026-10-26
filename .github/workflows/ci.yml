@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -17,11 +17,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-${{ hashFiles('CMakeLists.txt') }}
+          key: deps-macos-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
 
       - name: Unit tests
@@ -34,3 +34,22 @@ jobs:
         run: |
           killall -9 AudioComponentRegistrar || true
           auval -v aufx Cntr Mcon
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-windows-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Build
+        run: |
+          cmake -B build
+          cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release --output-on-failure

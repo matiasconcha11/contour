@@ -175,7 +175,7 @@ TEST_CASE_METHOD (Fixture, "Bypass fades to the dry signal", "[processor]")
 
 TEST_CASE_METHOD (Fixture, "Free-running Hz mode follows its own rate", "[processor]")
 {
-    setParam (processor, Params::sync, 0.0f);
+    setParam (processor, Params::mode, (float) Params::hzMode);
     setParam (processor, Params::rateHz, 2.0f);
     process (processor);
 

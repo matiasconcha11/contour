@@ -3,10 +3,13 @@
 A ShaperBox-style shaper: draw a curve per module and Contour applies it in time with the host.
 JUCE 9, builds AU + VST3 + Standalone.
 
-- **Modules:** Volume, Pan (equal-power) and Width (mid/side), each with its own curve, on/off and depth
-- **Timing:** tempo-synced rates from 1/32 to 8 bars incl. triplets and dotted, or free Hz; offset; smoothing
-- **Output:** input gain, dry/wet mix, output gain, click-free bypass
-- **Presets:** 13 factory presets; user presets saved as `.contourpreset` files in
+- **Modules:** Volume, Pan, Width, Filter (LP/HP/BP + resonance), Drive, Crush and Time (tape stop,
+  stutter, reverse), each with its own curve, on/off and depth
+- **Timing:** Tempo (follows the host, freezes when it stops), Hz (free-running) or Audio (restarts the curve
+  on each hit above a threshold); rates from 1/32 to 8 bars incl. triplets and dotted; offset; smoothing
+- **Editing:** shapes, invert, reverse, copy/paste between modules and instances, undo/redo, grid
+- **Output:** input gain, dry/wet mix, output gain with meter, click-free bypass
+- **Presets:** 23 factory presets in categories; user presets saved as `.contourpreset` files in
   `~/Library/Audio/Presets/Matias Concha/Contour/` (falls back to `~/Documents/Contour Presets` if that isn't writable)
 
 ## Build and test
@@ -22,7 +25,13 @@ make check      # test + validate
 ```
 
 Requires Xcode, CMake and Ninja (`brew install cmake ninja`). The first build downloads JUCE and Catch2.
-CI (`.github/workflows/ci.yml`) runs the build, unit tests, pluginval and auval on every push.
+CI (`.github/workflows/ci.yml`) builds on macOS (unit tests, pluginval, auval) and Windows (unit tests) on every push.
+
+## Releases
+
+Push a version tag (`git tag v0.3.0 && git push --tags`) and `.github/workflows/release.yml` builds a universal
+macOS AU + VST3 and a Windows VST3, and attaches the zips to a draft GitHub release. The macOS builds are not
+notarized: that needs an Apple Developer account, without which other Macs will block the plugin.
 
 Before a release, also check by hand in Logic, Ableton and Reaper: tempo changes and looping,
 parameter automation, sample rate / buffer size changes, offline bounce vs realtime, and session reload.

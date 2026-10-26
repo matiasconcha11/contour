@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Curve.h"
+#include "Dsp.h"
 #include "Parameters.h"
 
 class ContourProcessor : public juce::AudioProcessor,
@@ -59,10 +60,15 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     std::array<Curve, Params::numModules> curves;
 
+    // Curve edits are undoable; parameter changes are left to the host's own undo.
+    juce::UndoManager undoManager;
+
     // Written by the audio thread, read by the editor.
     std::atomic<float> displayPhase { 0.0f };
     std::array<std::atomic<float>, waveformBins> waveIn {};
     std::array<std::atomic<float>, waveformBins> waveOut {};
+    std::atomic<float> outputPeakLeft { 0.0f }, outputPeakRight { 0.0f };
+    std::atomic<int> triggerCount { 0 };
 
 private:
     void applyParameterState (const juce::ValueTree&);
@@ -78,24 +84,37 @@ private:
     };
 
     std::array<ModuleParams, Params::numModules> moduleParams;
+    std::atomic<float>* modeParam = nullptr;
     std::atomic<float>* rateParam = nullptr;
     std::atomic<float>* rateHzParam = nullptr;
-    std::atomic<float>* syncParam = nullptr;
+    std::atomic<float>* thresholdParam = nullptr;
     std::atomic<float>* offsetParam = nullptr;
     std::atomic<float>* smoothParam = nullptr;
+    std::atomic<float>* filterTypeParam = nullptr;
+    std::atomic<float>* filterResonanceParam = nullptr;
     std::atomic<float>* mixParam = nullptr;
     std::atomic<float>* inputGainParam = nullptr;
     std::atomic<float>* outputGainParam = nullptr;
     std::atomic<float>* bypassParam = nullptr;
 
     double currentSampleRate = 44100.0;
-    double freeRunPpq = 0.0;
-    double hzPhase = 0.0;
 
-    // Per-module modulation values after click smoothing.
-    float smoothedGain = 1.0f;
-    float smoothedPan = 0.0f;
-    float smoothedWidth = 1.0f;
+    // Clocks. tempoPpq tracks the host (or runs on its own without one); freePhase drives Hz and Audio modes.
+    double tempoPpq = 0.0;
+    double freePhase = 0.0;
+
+    // Audio trigger detection.
+    float triggerEnvelope = 0.0f;
+    bool triggerArmed = true;
+    int samplesSinceTrigger = 0;
+
+    // Modulation values after click smoothing, in each module's own units.
+    std::array<float, Params::numModules> smoothed {};
+    float filterWet = 0.0f;
+
+    std::array<Dsp::StateVariableFilter, 2> filters;
+    std::array<Dsp::DelayLine, 2> delays;
+    std::array<Dsp::Crusher, 2> crushers;
     juce::SmoothedValue<float> mixSmoothed, inputGainSmoothed, outputGainSmoothed;
 
     int waveBin = 0;

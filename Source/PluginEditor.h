@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "Components.h"
 #include "CurveEditor.h"
 #include "LookAndFeel.h"
 #include "PluginProcessor.h"
@@ -42,6 +43,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    bool keyPressed (const juce::KeyPress&) override;
 
     // Called after the host restores a session.
     void stateReloaded();
@@ -54,48 +56,63 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
 
-    struct ModuleTab
-    {
-        juce::TextButton tab;
-        juce::ToggleButton power;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> powerAttachment;
-    };
-
     void timerCallback() override;
     void setUpKnob (Knob&, const juce::String& paramId, const juce::String& name, bool bipolar = false);
     void selectModule (int module);
-    void curveEdited();
+
+    // Curve edits go through the undo manager, one step per gesture or button press.
+    void beginCurveEdit();
+    void endCurveEdit();
+    void editCurve (const std::function<void (Curve&)>& change);
+    void copyCurve();
+    void pasteCurve();
 
     void showPresetMenu();
     void savePreset();
     void savePresetAs();
     void refreshPresetLabel();
-
     void showShapesMenu();
 
     ContourProcessor& processor;
     PresetManager presets;
     ContourLookAndFeel lookAndFeel;
+    juce::TooltipWindow tooltips { this, 600 };
 
     int currentModule = Params::volume;
+    std::vector<CurvePoint> pointsBeforeEdit;
 
     // Header
     juce::TextButton prevButton { "<" }, presetButton, nextButton { ">" }, saveButton { "Save" };
     juce::TextButton bypassButton { "Bypass" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
-    // Modules and curve tools
-    std::array<ModuleTab, Params::numModules> tabs;
-    juce::TextButton shapesButton { "Shapes" }, invertButton { "Invert" }, reverseButton { "Reverse" }, clearButton { "Clear" };
+    // Modules and curve
+    ModuleStrip moduleStrip;
+    juce::TextButton shapesButton { "Shapes" }, invertButton { "Invert" }, reverseButton { "Reverse" },
+        copyButton { "Copy" }, pasteButton { "Paste" }, clearButton { "Clear" }, undoButton { "Undo" }, redoButton { "Redo" };
     juce::ComboBox gridBox;
     CurveEditor curveEditor;
 
-    // Controls
-    Knob rate, rateHz, offset, smooth, depth, input, mix, output;
-    juce::TextButton syncButton { "Sync" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAttachment;
+    // Timing
+    Knob rate, rateHz, offset, smooth, threshold;
+    ChoiceSelector modeSelector;
+
+    // Module
+    Knob depth, resonance;
+    juce::ComboBox filterTypeBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterTypeAttachment;
+
+    // Output
+    Knob input, mix, output;
+    LevelMeter meter;
 
     PresetDialog dialog;
+
+    // Layout regions remembered for painting group captions.
+    juce::Rectangle<int> timingGroup, moduleGroup, outputGroup;
+    int lastTriggerCount = 0;
+    int frameCount = 0;
+    float triggerFlash = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ContourEditor)
 };

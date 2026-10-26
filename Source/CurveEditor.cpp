@@ -31,6 +31,13 @@ void CurveEditor::setCurve (Curve& curveToEdit, juce::Colour newAccent, bool sho
     repaint();
 }
 
+void CurveEditor::setCaption (const juce::String& title, const juce::String& hint)
+{
+    captionTitle = title;
+    captionHint = hint;
+    repaint();
+}
+
 void CurveEditor::setActive (bool isActive)
 {
     active = isActive;
@@ -139,6 +146,18 @@ void CurveEditor::paint (juce::Graphics& g)
         g.drawDashedLine ({ area.getX(), y, area.getRight(), y }, dashes, 2, 1.0f);
     }
 
+    if (captionTitle.isNotEmpty())
+    {
+        auto caption = area.toNearestInt().reduced (10, 8).removeFromTop (16);
+        g.setFont (Theme::caps (11.0f));
+        g.setColour (colour);
+        const auto titleWidth = juce::GlyphArrangement::getStringWidthInt (Theme::caps (11.0f), captionTitle) + 12;
+        g.drawText (captionTitle, caption.removeFromLeft (titleWidth), juce::Justification::centredLeft);
+        g.setFont (Theme::font (11.5f));
+        g.setColour (Theme::dim);
+        g.drawText (active ? captionHint : "Off - switch the module on in the list", caption, juce::Justification::centredLeft);
+    }
+
     // Audio over one cycle: input as a dim silhouette, output in the module colour.
     const auto binWidth = area.getWidth() / (float) waveformBins;
 
@@ -230,6 +249,9 @@ void CurveEditor::mouseExit (const juce::MouseEvent&)
 
 void CurveEditor::mouseDown (const juce::MouseEvent& e)
 {
+    if (onEditStart)
+        onEditStart();
+
     dragPoint = pointAt (e.position);
     bendSegment = -1;
 
@@ -300,10 +322,17 @@ void CurveEditor::mouseUp (const juce::MouseEvent&)
     dragPoint = -1;
     bendSegment = -1;
     repaint();
+
+    if (onEditEnd)
+        onEditEnd();
 }
 
 void CurveEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    if (onEditStart)
+        onEditStart();
+
+    const juce::ScopeGuard endEdit { [this] { if (onEditEnd) onEditEnd(); } };
     auto points = curve->getPoints();
     const auto hit = pointAt (e.position);
 

@@ -30,6 +30,7 @@ namespace
 
     struct FactoryPreset
     {
+        const char* category;
         const char* name;
         std::function<void (PresetBuilder&)> build;
     };
@@ -37,42 +38,93 @@ namespace
     const std::vector<FactoryPreset>& factoryPresets()
     {
         using P = Params::Module;
+        const auto off = [] (PresetBuilder& b, int m) { b.set (Params::onId (m), 0.0f); };
 
         static const std::vector<FactoryPreset> list {
-            { "Init", [] (PresetBuilder&) {} },
-            { "Sidechain 1/4", [] (PresetBuilder& b) { b.rate ("1/4").module (P::volume, true, 1.0f, Curve::preset (Curve::duck)); } },
-            { "Soft Pump 1/4", [] (PresetBuilder& b) {
+            { "", "Init", [] (PresetBuilder&) {} },
+
+            { "Volume", "Sidechain 1/4", [] (PresetBuilder& b) { b.rate ("1/4").module (P::volume, true, 1.0f, Curve::preset (Curve::duck)); } },
+            { "Volume", "Soft Pump 1/4", [] (PresetBuilder& b) {
                   b.rate ("1/4").set (Params::smooth, 4.0f).module (P::volume, true, 0.8f, Curve::preset (Curve::pump));
               } },
-            { "Half-Time Pump", [] (PresetBuilder& b) { b.rate ("1/2").module (P::volume, true, 1.0f, Curve::preset (Curve::duck)); } },
-            { "Trance Gate", [] (PresetBuilder& b) {
+            { "Volume", "Half-Time Pump", [] (PresetBuilder& b) { b.rate ("1/2").module (P::volume, true, 1.0f, Curve::preset (Curve::duck)); } },
+            { "Volume", "Trance Gate", [] (PresetBuilder& b) {
                   b.rate ("1 bar").set (Params::smooth, 2.0f).module (P::volume, true, 1.0f, Curve::preset (Curve::tranceGate));
               } },
-            { "Chopper 1/16", [] (PresetBuilder& b) {
+            { "Volume", "Chopper 1/16", [] (PresetBuilder& b) {
                   b.rate ("1/8").set (Params::smooth, 1.0f).module (P::volume, true, 1.0f, Curve::gate ("x."));
               } },
-            { "Triplet Chop", [] (PresetBuilder& b) {
+            { "Volume", "Triplet Chop", [] (PresetBuilder& b) {
                   b.rate ("1/8T").set (Params::smooth, 1.0f).module (P::volume, true, 0.9f, Curve::gate ("x."));
               } },
-            { "Swell 1 Bar", [] (PresetBuilder& b) { b.rate ("1 bar").module (P::volume, true, 1.0f, Curve::preset (Curve::rampUp)); } },
-            { "Tape Fade 2 Bars", [] (PresetBuilder& b) {
-                  b.rate ("2 bars").module (P::volume, true, 1.0f, Curve::preset (Curve::rampDown));
+            { "Volume", "Swell 1 Bar", [] (PresetBuilder& b) { b.rate ("1 bar").module (P::volume, true, 1.0f, Curve::preset (Curve::rampUp)); } },
+            { "Volume", "Kick Duck (Audio)", [] (PresetBuilder& b) {
+                  b.set (Params::mode, (float) Params::audioMode).set (Params::threshold, -20.0f).rate ("1/4")
+                      .module (P::volume, true, 1.0f, Curve::preset (Curve::duck));
               } },
-            { "Auto-Pan 1/2", [] (PresetBuilder& b) {
-                  b.rate ("1/2").module (P::volume, false, 1.0f, Curve::preset (Curve::flatTop))
-                      .module (P::pan, true, 0.8f, Curve::preset (Curve::sine));
+
+            { "Stereo", "Auto-Pan 1/2", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/2").module (P::pan, true, 0.8f, Curve::preset (Curve::sine));
               } },
-            { "Ping-Pong 1/8", [] (PresetBuilder& b) {
-                  b.rate ("1/4").set (Params::smooth, 3.0f).module (P::volume, false, 1.0f, Curve::preset (Curve::flatTop))
-                      .module (P::pan, true, 0.7f, Curve::gate ("x."));
+            { "Stereo", "Ping-Pong 1/8", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/4").set (Params::smooth, 3.0f).module (P::pan, true, 0.7f, Curve::gate ("x."));
               } },
-            { "Width Breathe", [] (PresetBuilder& b) {
-                  b.rate ("1 bar").module (P::volume, false, 1.0f, Curve::preset (Curve::flatTop))
-                      .module (P::width, true, 1.0f, Curve::preset (Curve::sine));
+            { "Stereo", "Width Breathe", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1 bar").module (P::width, true, 1.0f, Curve::preset (Curve::sine));
               } },
-            { "Wide Pump", [] (PresetBuilder& b) {
+            { "Stereo", "Wide Pump", [] (PresetBuilder& b) {
                   b.rate ("1/4").module (P::volume, true, 0.9f, Curve::preset (Curve::duck))
                       .module (P::width, true, 0.6f, Curve::preset (Curve::rampUp));
+              } },
+
+            { "Filter", "Filter Sweep 1 Bar", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1 bar").set (Params::filterResonance, 0.5f).module (P::filter, true, 0.85f, Curve::preset (Curve::sine));
+              } },
+            { "Filter", "Filter Pump 1/4", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/4").set (Params::filterResonance, 0.35f).module (P::filter, true, 0.8f, Curve::preset (Curve::duck));
+              } },
+            { "Filter", "High-pass Riser 4 Bars", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("4 bars").set (Params::filterType, 1.0f).set (Params::filterResonance, 0.4f)
+                      .module (P::filter, true, 0.9f, Curve::preset (Curve::rampUp));
+              } },
+            { "Filter", "Wah 1/8", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/8").set (Params::filterType, 2.0f).set (Params::filterResonance, 0.6f)
+                      .module (P::filter, true, 0.7f, Curve::preset (Curve::triangle));
+              } },
+
+            { "Lo-Fi", "Drive Pulse 1/4", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/4").module (P::drive, true, 0.7f, Curve::preset (Curve::rampDown));
+              } },
+            { "Lo-Fi", "Crush Gate 1/8", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/4").module (P::crush, true, 0.8f, Curve::gate (".x"));
+              } },
+            { "Lo-Fi", "Dusty Pump", [] (PresetBuilder& b) {
+                  b.rate ("1/4").module (P::volume, true, 0.7f, Curve::preset (Curve::pump))
+                      .module (P::crush, true, 0.45f, Curve::preset (Curve::rampDown))
+                      .module (P::filter, true, 0.4f, Curve::preset (Curve::rampUp));
+              } },
+
+            { "Time", "Tape Stop 1 Bar", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1 bar").set (Params::smooth, 5.0f).module (P::time, true, 1.0f, Curve::preset (Curve::tapeStop));
+              } },
+            { "Time", "Stutter 1/4", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/4").set (Params::smooth, 0.5f).module (P::time, true, 1.0f, Curve::preset (Curve::stairs));
+              } },
+            { "Time", "Reverse 1/2", [off] (PresetBuilder& b) {
+                  off (b, P::volume);
+                  b.rate ("1/2").set (Params::smooth, 0.5f)
+                      .module (P::time, true, 1.0f, { { 0.0f, 1.0f, 0.0f }, { 0.5f, 1.0f, 0.0f }, { 0.999f, 0.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } });
               } },
         };
 
@@ -108,14 +160,14 @@ void PresetManager::refresh()
     presets.clear();
 
     for (const auto& factory : factoryPresets())
-        presets.push_back ({ factory.name, true, {} });
+        presets.push_back ({ factory.name, true, {}, factory.category });
 
     auto files = userDirectory.findChildFiles (juce::File::findFiles, false, juce::String ("*") + fileExtension);
     std::sort (files.begin(), files.end(), [] (const auto& a, const auto& b)
                { return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0; });
 
     for (const auto& file : files)
-        presets.push_back ({ file.getFileNameWithoutExtension(), false, file });
+        presets.push_back ({ file.getFileNameWithoutExtension(), false, file, "User" });
 }
 
 void PresetManager::applyFactory (int index)
@@ -126,9 +178,8 @@ void PresetManager::applyFactory (int index)
         if (param != processor.getBypassParameter())
             param->setValueNotifyingHost (param->getDefaultValue());
 
-    processor.curves[Params::volume].setPoints (Curve::preset (Curve::duck));
-    processor.curves[Params::pan].setPoints (Curve::preset (Curve::sine));
-    processor.curves[Params::width].setPoints (Curve::preset (Curve::sine));
+    for (int m = 0; m < Params::numModules; ++m)
+        processor.curves[(size_t) m].setPoints (Params::defaultCurve (m));
 
     PresetBuilder builder { processor };
     factoryPresets()[(size_t) index].build (builder);
@@ -168,6 +219,7 @@ bool PresetManager::load (int index)
         processor.setStateTree (state);
     }
 
+    processor.undoManager.clearUndoHistory();
     processor.updateHostDisplay (juce::AudioProcessor::ChangeDetails().withNonParameterStateChanged (true));
     return true;
 }

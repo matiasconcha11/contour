@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Contour VERSION 0.2.0)
+# Must be set before project(). Builds are native-only by default; release builds pass
+# -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" for a universal binary.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
+
+project(Contour VERSION 0.3.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 
 include(FetchContent)
 FetchContent_Declare(
@@ -28,6 +30,7 @@ juce_add_plugin(Contour
     COPY_PLUGIN_AFTER_BUILD TRUE)
 
 set(CONTOUR_SOURCES
+    Source/Components.cpp
     Source/Curve.cpp
     Source/CurveEditor.cpp
     Source/LookAndFeel.cpp
@@ -67,6 +70,7 @@ if(CONTOUR_BUILD_TESTS)
     add_executable(ContourTests
         ${CONTOUR_SOURCES}
         Tests/CurveTests.cpp
+        Tests/ModuleTests.cpp
         Tests/PresetTests.cpp
         Tests/ProcessorTests.cpp)
 

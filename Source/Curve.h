@@ -29,8 +29,11 @@ public:
         sine,
         square,
         tranceGate,
+        stairs,
+        tapeStop,
         flatTop,
         flatCentre,
+        flatBottom,
         numShapes
     };
 

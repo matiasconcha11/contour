@@ -36,6 +36,56 @@ namespace Params
         }
     }
 
+    juce::String moduleHint (int module)
+    {
+        switch (module)
+        {
+            case volume: return "Curve sets the level";
+            case pan: return "Bottom is left, top is right";
+            case width: return "Bottom is mono, centre is unchanged, top is extra wide";
+            case filter: return "Curve sets the cutoff";
+            case drive: return "Curve sets the saturation";
+            case crush: return "Curve sets bit depth and sample-rate reduction";
+            case time: return "Lower reads further back: slopes slow down or reverse, steps repeat";
+            default: return {};
+        }
+    }
+
+    Curve::Shape neutralShape (int module)
+    {
+        switch (module)
+        {
+            case pan:
+            case width: return Curve::flatCentre;
+            case drive:
+            case crush: return Curve::flatBottom;
+            default: return Curve::flatTop;
+        }
+    }
+
+    std::vector<CurvePoint> defaultCurve (int module)
+    {
+        switch (module)
+        {
+            case volume: return Curve::preset (Curve::duck);
+            case filter: return Curve::preset (Curve::sine);
+            case drive: return Curve::preset (Curve::rampDown);
+            case crush: return Curve::preset (Curve::rampUp);
+            case time: return Curve::preset (Curve::tapeStop);
+            default: return Curve::preset (Curve::sine);
+        }
+    }
+
+    juce::StringArray modeNames()
+    {
+        return { "Tempo", "Hz", "Audio" };
+    }
+
+    juce::StringArray filterTypeNames()
+    {
+        return { "Low-pass", "High-pass", "Band-pass" };
+    }
+
     juce::StringArray rateNames()
     {
         juce::StringArray names;
@@ -63,11 +113,14 @@ namespace Params
 
         AudioProcessorValueTreeState::ParameterLayout layout;
 
+        layout.add (std::make_unique<AudioParameterChoice> (ParameterID { mode, 1 }, "Mode", modeNames(), tempoMode));
         layout.add (std::make_unique<AudioParameterChoice> (ParameterID { rate, 1 }, "Rate", rateNames(), defaultRateIndex()));
-        layout.add (std::make_unique<AudioParameterBool> (ParameterID { sync, 1 }, "Sync", true));
         layout.add (std::make_unique<AudioParameterFloat> (
             ParameterID { rateHz, 1 }, "Rate (Hz)", NormalisableRange<float> (0.05f, 20.0f, 0.0f, 0.3f), 1.0f,
             AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return String (v, v < 1.0f ? 2 : 1) + " Hz"; })));
+        layout.add (std::make_unique<AudioParameterFloat> (
+            ParameterID { threshold, 1 }, "Trigger Threshold", NormalisableRange<float> (-60.0f, 0.0f, 0.1f), -18.0f,
+            AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return String (v, 1) + " dB"; })));
         layout.add (std::make_unique<AudioParameterFloat> (ParameterID { offset, 1 }, "Offset",
                                                            NormalisableRange<float> (0.0f, 1.0f), 0.0f, percentAttributes()));
         layout.add (std::make_unique<AudioParameterFloat> (
@@ -80,6 +133,10 @@ namespace Params
             layout.add (std::make_unique<AudioParameterFloat> (ParameterID { depthId (m), 1 }, moduleNames[m] + " Depth",
                                                                NormalisableRange<float> (0.0f, 1.0f), 1.0f, percentAttributes()));
         }
+
+        layout.add (std::make_unique<AudioParameterChoice> (ParameterID { filterType, 1 }, "Filter Type", filterTypeNames(), 0));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { filterResonance, 1 }, "Filter Resonance",
+                                                           NormalisableRange<float> (0.0f, 1.0f), 0.3f, percentAttributes()));
 
         const auto gainAttributes = AudioParameterFloatAttributes().withStringFromValueFunction (decibels);
         layout.add (std::make_unique<AudioParameterFloat> (ParameterID { inputGain, 1 }, "Input",

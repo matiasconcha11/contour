@@ -14,6 +14,7 @@ public:
         juce::String name;
         bool factory = false;
         juce::File file;
+        juce::String category;
     };
 
     explicit PresetManager (ContourProcessor&, juce::File userDirectory = defaultUserDirectory());

@@ -14,7 +14,13 @@ namespace Theme
 
     const juce::Colour modules[] { juce::Colour (0xffffb347),   // volume: amber
                                    juce::Colour (0xff6fd3c6),   // pan: teal
-                                   juce::Colour (0xffb18cff) }; // width: violet
+                                   juce::Colour (0xffb18cff),   // width: violet
+                                   juce::Colour (0xff5fa8ff),   // filter: blue
+                                   juce::Colour (0xffff7a59),   // drive: coral
+                                   juce::Colour (0xffc2e05a),   // crush: lime
+                                   juce::Colour (0xffff74b8) }; // time: pink
+
+    const juce::Colour accent = modules[0];
 
     inline juce::Font font (float height, bool bold = false)
     {

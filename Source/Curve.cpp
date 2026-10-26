@@ -134,7 +134,8 @@ void Curve::reverse()
 
 juce::StringArray Curve::presetNames()
 {
-    return { "Duck", "Pump", "Ramp Up", "Ramp Down", "Triangle", "Sine", "Square", "Trance Gate", "Flat (Top)", "Flat (Centre)" };
+    return { "Duck", "Pump", "Ramp Up", "Ramp Down", "Triangle", "Sine", "Square", "Trance Gate",
+             "Stairs", "Tape Stop", "Flat (Top)", "Flat (Centre)", "Flat (Bottom)" };
 }
 
 std::vector<CurvePoint> Curve::gate (const juce::String& pattern, float high, float low)
@@ -178,8 +179,16 @@ std::vector<CurvePoint> Curve::preset (int shape)
             return gate ("xx..");
         case tranceGate:
             return gate ("x.xxx.x.xx.xx.x.");
+        case stairs: // four steps down; on the Time module this repeats the first slice
+            return { { 0.0f, 1.0f, 0.0f }, { 0.249f, 1.0f, 0.0f }, { 0.25f, 0.75f, 0.0f }, { 0.499f, 0.75f, 0.0f },
+                     { 0.5f, 0.5f, 0.0f }, { 0.749f, 0.5f, 0.0f }, { 0.75f, 0.25f, 0.0f }, { 0.999f, 0.25f, 0.0f },
+                     { 1.0f, 1.0f, 0.0f } };
+        case tapeStop: // on the Time module: playback slows to a halt by the end of the cycle
+            return { { 0.0f, 1.0f, 0.25f }, { 0.999f, 0.5f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
         case flatCentre:
             return { { 0.0f, 0.5f, 0.0f }, { 1.0f, 0.5f, 0.0f } };
+        case flatBottom:
+            return { { 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
         default: // flatTop
             return { { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } };
     }
