@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 
 #include <cmath>
+#include <limits>
 #include <optional>
 
 namespace
@@ -123,7 +124,7 @@ void ContourProcessor::prepareToPlay (double sampleRate, int)
 
     triggerEnvelope = 0.0f;
     triggerArmed = true;
-    samplesSinceTrigger = 0;
+    samplesSinceTrigger = std::numeric_limits<int>::max() / 2; // the first hit after starting must count
 
     const auto bypassed = bypassParam->load() > 0.5f;
     mixSmoothed.reset (sampleRate, 0.03);

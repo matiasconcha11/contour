@@ -162,8 +162,8 @@ std::vector<CurvePoint> Curve::preset (int shape)
 {
     switch (shape)
     {
-        case duck: // classic sidechain dip
-            return { { 0.0f, 0.0f, -0.6f }, { 0.35f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
+        case duck: // classic sidechain dip: a short hold at the bottom, then a curved recovery
+            return { { 0.0f, 0.0f, 0.0f }, { 0.03f, 0.0f, -0.3f }, { 0.4f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } };
         case pump: // smoother, longer recovery
             return { { 0.0f, 0.15f, -0.35f }, { 0.6f, 1.0f, 0.0f }, { 0.9f, 1.0f, 0.5f }, { 1.0f, 0.15f, 0.0f } };
         case rampUp:
