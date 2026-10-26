@@ -48,6 +48,7 @@ namespace Params
     inline const juce::String rate { "rate" };
     inline const juce::String rateHz { "rateHz" };
     inline const juce::String threshold { "threshold" };
+    inline const juce::String triggerSource { "triggerSource" };
     inline const juce::String offset { "offset" };
     inline const juce::String smooth { "smooth" };
     inline const juce::String filterType { "filterType" };
@@ -58,6 +59,7 @@ namespace Params
     inline const juce::String bypass { "bypass" };
 
     juce::StringArray modeNames();
+    juce::StringArray triggerSourceNames();
     juce::StringArray rateNames();
     juce::StringArray filterTypeNames();
     int defaultRateIndex();

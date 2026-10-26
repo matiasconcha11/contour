@@ -58,9 +58,13 @@ namespace
                   b.rate ("1/8T").set (Params::smooth, 1.0f).module (P::volume, true, 0.9f, Curve::gate ("x."));
               } },
             { "Volume", "Swell 1 Bar", [] (PresetBuilder& b) { b.rate ("1 bar").module (P::volume, true, 1.0f, Curve::preset (Curve::rampUp)); } },
-            { "Volume", "Kick Duck (Audio)", [] (PresetBuilder& b) {
+            { "Volume", "Self Duck (Audio)", [] (PresetBuilder& b) {
                   b.set (Params::mode, (float) Params::audioMode).set (Params::threshold, -20.0f).rate ("1/4")
                       .module (P::volume, true, 1.0f, Curve::preset (Curve::duck));
+              } },
+            { "Volume", "Kick Duck (Sidechain)", [] (PresetBuilder& b) {
+                  b.set (Params::mode, (float) Params::audioMode).set (Params::triggerSource, 1.0f).set (Params::threshold, -24.0f)
+                      .rate ("1/4").module (P::volume, true, 1.0f, Curve::preset (Curve::duck));
               } },
 
             { "Stereo", "Auto-Pan 1/2", [off] (PresetBuilder& b) {

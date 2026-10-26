@@ -81,6 +81,11 @@ namespace Params
         return { "Tempo", "Hz", "Audio" };
     }
 
+    juce::StringArray triggerSourceNames()
+    {
+        return { "Input", "Sidechain" };
+    }
+
     juce::StringArray filterTypeNames()
     {
         return { "Low-pass", "High-pass", "Band-pass" };
@@ -127,6 +132,7 @@ namespace Params
         layout.add (std::make_unique<AudioParameterFloat> (
             ParameterID { threshold, 1 }, "Trigger Threshold", NormalisableRange<float> (-60.0f, 0.0f, 0.1f), -18.0f,
             AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return String (v, 1) + " dB"; })));
+        layout.add (std::make_unique<AudioParameterChoice> (ParameterID { triggerSource, 1 }, "Trigger Source", triggerSourceNames(), 0));
         layout.add (std::make_unique<AudioParameterFloat> (ParameterID { offset, 1 }, "Offset",
                                                            NormalisableRange<float> (0.0f, 1.0f), 0.0f, percentAttributes()));
         layout.add (std::make_unique<AudioParameterFloat> (

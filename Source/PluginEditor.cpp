@@ -169,7 +169,8 @@ ContourEditor::ContourEditor (ContourProcessor& p)
       presets (p),
       moduleStrip (p),
       curveEditor (p.curves[Params::volume], p.waveIn, p.waveOut),
-      modeSelector (*p.apvts.getParameter (Params::mode), Params::modeNames())
+      modeSelector (*p.apvts.getParameter (Params::mode), Params::modeNames()),
+      sourceSelector (*p.apvts.getParameter (Params::triggerSource), { "Input", "SC" })
 {
     setLookAndFeel (&lookAndFeel);
     setWantsKeyboardFocus (true);
@@ -231,6 +232,8 @@ ContourEditor::ContourEditor (ContourProcessor& p)
     setUpKnob (threshold, Params::threshold, "Threshold");
     modeSelector.setTooltip ("Tempo follows the host; Hz runs freely; Audio restarts the curve on each hit above the threshold");
     addAndMakeVisible (modeSelector);
+    sourceSelector.setTooltip ("What triggers the curve in Audio mode: this track, or the sidechain input (route a kick to it in the host)");
+    addAndMakeVisible (sourceSelector);
 
     // Module.
     setUpKnob (depth, Params::depthId (Params::volume), "Depth");
@@ -607,6 +610,7 @@ void ContourEditor::resized()
         placeKnob (smooth, row);
         placeKnob (threshold, row);
         modeSelector.setBounds (strip.withWidth (knobWidth * 3).reduced (6, 2));
+        sourceSelector.setBounds (strip.withTrimmedLeft (knobWidth * 3).withWidth (knobWidth).reduced (4, 2));
     }
 
     {
@@ -674,8 +678,17 @@ void ContourEditor::timerCallback()
     rate.label.setVisible (! hz);
     rateHz.slider.setVisible (hz);
     rateHz.label.setVisible (hz);
-    threshold.slider.setEnabled (mode == Params::audioMode);
-    threshold.label.setAlpha (mode == Params::audioMode ? 1.0f : 0.4f);
+    const auto audioMode = mode == Params::audioMode;
+    threshold.slider.setEnabled (audioMode);
+    threshold.label.setAlpha (audioMode ? 1.0f : 0.4f);
+    sourceSelector.setEnabled (audioMode);
+    sourceSelector.setAlpha (audioMode ? 1.0f : 0.4f);
+
+    // Point out a sidechain trigger with nothing routed to it.
+    const auto waitingForSidechain = audioMode && (int) processor.apvts.getRawParameterValue (Params::triggerSource)->load() == 1
+                                     && ! processor.sidechainConnected.load();
+    threshold.label.setText (waitingForSidechain ? "NO SIDECHAIN" : "THRESHOLD", juce::dontSendNotification);
+    threshold.label.setColour (juce::Label::textColourId, waitingForSidechain ? juce::Colour (0xffff6b6b) : Theme::dim);
 
     const auto moduleOn = processor.apvts.getRawParameterValue (Params::onId (currentModule))->load() > 0.5f;
     curveEditor.setActive (moduleOn);
@@ -686,7 +699,7 @@ void ContourEditor::timerCallback()
     triggerFlash = triggers != lastTriggerCount ? 1.0f : triggerFlash * 0.85f;
     lastTriggerCount = triggers;
 
-    if (mode == Params::audioMode)
+    if (audioMode)
         repaint (modeSelector.getBounds().withWidth (modeSelector.getWidth() + 20));
 
     undoButton.setEnabled (processor.undoManager.canUndo());

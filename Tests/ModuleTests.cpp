@@ -332,3 +332,53 @@ TEST_CASE_METHOD (Fixture, "Time module keeps its memory during normal playback"
 
     CHECK_THAT (echoed, WithinAbs (1.0f, 1.0e-4));
 }
+
+TEST_CASE_METHOD (Fixture, "Sidechain hits trigger the curve, the track's own audio doesn't", "[transport]")
+{
+    // Main stereo in/out plus a stereo sidechain, as when a kick is routed to it in the host.
+    auto layout = processor.getBusesLayout();
+    layout.inputBuses.getReference (1) = juce::AudioChannelSet::stereo();
+    REQUIRE (processor.setBusesLayout (layout));
+    processor.prepareToPlay (sampleRate, blockSize);
+
+    set (Params::mode, (float) Params::audioMode);
+    set (Params::triggerSource, 1.0f);
+    set (Params::threshold, -20.0f);
+
+    juce::AudioBuffer<float> buffer (4, blockSize);
+    juce::MidiBuffer midi;
+
+    for (int b = 0; b < 20; ++b)
+    {
+        buffer.clear();
+
+        for (int i = 0; i < blockSize; ++i)
+        {
+            // Loud main signal all the time; one sidechain hit in block 10.
+            buffer.setSample (0, i, 0.9f);
+            buffer.setSample (1, i, 0.9f);
+
+            if (b == 10 && i < 50)
+            {
+                buffer.setSample (2, i, 0.8f);
+                buffer.setSample (3, i, 0.8f);
+            }
+        }
+
+        processor.processBlock (buffer, midi);
+    }
+
+    CHECK (processor.sidechainConnected.load());
+    CHECK (processor.triggerCount.load() == 1);
+}
+
+TEST_CASE_METHOD (Fixture, "Sidechain source with nothing connected never triggers", "[transport]")
+{
+    set (Params::mode, (float) Params::audioMode);
+    set (Params::triggerSource, 1.0f);
+    set (Params::threshold, -20.0f);
+    run (20, [] (int) { return 0.9f; });
+
+    CHECK_FALSE (processor.sidechainConnected.load());
+    CHECK (processor.triggerCount.load() == 0);
+}

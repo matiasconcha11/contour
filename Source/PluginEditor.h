@@ -95,7 +95,7 @@ private:
 
     // Timing
     Knob rate, rateHz, offset, smooth, threshold;
-    ChoiceSelector modeSelector;
+    ChoiceSelector modeSelector, sourceSelector;
 
     // Module
     Knob depth, resonance;

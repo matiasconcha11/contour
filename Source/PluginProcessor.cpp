@@ -32,7 +32,8 @@ namespace
 ContourProcessor::ContourProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
+                          .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
       apvts (*this, nullptr, "PARAMS", Params::createLayout())
 {
     for (int m = 0; m < Params::numModules; ++m)
@@ -46,6 +47,7 @@ ContourProcessor::ContourProcessor()
     rateParam = apvts.getRawParameterValue (Params::rate);
     rateHzParam = apvts.getRawParameterValue (Params::rateHz);
     thresholdParam = apvts.getRawParameterValue (Params::threshold);
+    triggerSourceParam = apvts.getRawParameterValue (Params::triggerSource);
     offsetParam = apvts.getRawParameterValue (Params::offset);
     smoothParam = apvts.getRawParameterValue (Params::smooth);
     filterTypeParam = apvts.getRawParameterValue (Params::filterType);
@@ -85,7 +87,17 @@ bool ContourProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     if (out != juce::AudioChannelSet::mono() && out != juce::AudioChannelSet::stereo())
         return false;
 
-    return out == layouts.getMainInputChannelSet();
+    if (out != layouts.getMainInputChannelSet())
+        return false;
+
+    // The optional sidechain (trigger source in Audio mode) can be off, mono or stereo.
+    if (layouts.inputBuses.size() > 1)
+    {
+        const auto sidechain = layouts.getChannelSet (true, 1);
+        return sidechain.isDisabled() || sidechain == juce::AudioChannelSet::mono() || sidechain == juce::AudioChannelSet::stereo();
+    }
+
+    return true;
 }
 
 void ContourProcessor::prepareToPlay (double sampleRate, int)
@@ -166,9 +178,16 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     hostWasPlaying = hostPlaying;
     expectedHostPpq = tempoPpq + numSamples * ppqPerSample;
 
-    const auto stereo = getTotalNumOutputChannels() > 1;
-    auto* left = buffer.getWritePointer (0);
-    auto* right = stereo ? buffer.getWritePointer (1) : nullptr;
+    auto main = getBusBuffer (buffer, false, 0);
+    const auto stereo = main.getNumChannels() > 1;
+    auto* left = main.getWritePointer (0);
+    auto* right = stereo ? main.getWritePointer (1) : nullptr;
+
+    // Sidechain: only present when the host has connected something to it.
+    const auto* sidechainBus = getBus (true, 1);
+    const auto sidechainActive = sidechainBus != nullptr && sidechainBus->isEnabled() && getChannelCountOfBus (true, 1) > 0;
+    const auto sidechain = sidechainActive ? getBusBuffer (buffer, true, 1) : juce::AudioBuffer<float>();
+    sidechainConnected.store (sidechainActive, std::memory_order_relaxed);
 
     // Clock: phase of the first sample and the per-sample increment, in cycles.
     const auto mode = (int) modeParam->load();
@@ -202,6 +221,9 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 
     // Audio trigger: restart the cycle when the input crosses the threshold.
     const auto audioTrigger = mode == Params::audioMode;
+    const auto useSidechain = (int) triggerSourceParam->load() == 1;
+    const auto* sidechainL = sidechainActive ? sidechain.getReadPointer (0) : nullptr;
+    const auto* sidechainR = sidechainActive ? sidechain.getReadPointer (sidechain.getNumChannels() > 1 ? 1 : 0) : nullptr;
     const auto threshold = juce::Decibels::decibelsToGain (thresholdParam->load());
     const auto envelopeRelease = (float) std::exp (-1.0 / (0.03 * currentSampleRate));
     const auto minTriggerGap = (int) (0.05 * currentSampleRate);
@@ -247,7 +269,10 @@ void ContourProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 
         if (audioTrigger)
         {
-            triggerEnvelope = juce::jmax (std::abs (l), std::abs (r), triggerEnvelope * envelopeRelease);
+            // Detect on this track's audio, or on the sidechain (silence if nothing is connected).
+            const auto detectL = useSidechain ? (sidechainL != nullptr ? sidechainL[i] : 0.0f) : l;
+            const auto detectR = useSidechain ? (sidechainR != nullptr ? sidechainR[i] : 0.0f) : r;
+            triggerEnvelope = juce::jmax (std::abs (detectL), std::abs (detectR), triggerEnvelope * envelopeRelease);
             ++samplesSinceTrigger;
 
             if (triggerArmed && triggerEnvelope >= threshold && samplesSinceTrigger >= minTriggerGap)

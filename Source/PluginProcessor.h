@@ -69,6 +69,7 @@ public:
     std::array<std::atomic<float>, waveformBins> waveOut {};
     std::atomic<float> outputPeakLeft { 0.0f }, outputPeakRight { 0.0f };
     std::atomic<int> triggerCount { 0 };
+    std::atomic<bool> sidechainConnected { false };
 
 private:
     void applyParameterState (const juce::ValueTree&);
@@ -88,6 +89,7 @@ private:
     std::atomic<float>* rateParam = nullptr;
     std::atomic<float>* rateHzParam = nullptr;
     std::atomic<float>* thresholdParam = nullptr;
+    std::atomic<float>* triggerSourceParam = nullptr;
     std::atomic<float>* offsetParam = nullptr;
     std::atomic<float>* smoothParam = nullptr;
     std::atomic<float>* filterTypeParam = nullptr;
