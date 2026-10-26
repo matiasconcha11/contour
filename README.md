@@ -33,7 +33,24 @@ AU · VST3 · Standalone — macOS (Windows VST3 builds in CI) — built with [J
 
 ## Install
 
-There are no signed downloads yet, so for now Contour is built from source (it takes a few minutes):
+### Download
+
+Get the latest zip for your system from [Releases](https://github.com/matiasconcha11/contour/releases/latest).
+
+**macOS** — unzip and move the plugin into place:
+- AU (Logic, GarageBand): `Contour.component` → `~/Library/Audio/Plug-Ins/Components/`
+- VST3 (Ableton, Reaper, etc.): `Contour.vst3` → `~/Library/Audio/Plug-Ins/VST3/`
+
+The builds aren't notarized by Apple yet, so macOS blocks them at first. Clear the download flag in Terminal:
+```
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Contour.component ~/Library/Audio/Plug-Ins/VST3/Contour.vst3
+```
+Then restart your DAW and look for **Matias Concha → Contour**.
+
+**Windows** — unzip and move `Contour.vst3` into `C:\Program Files\Common Files\VST3\`. (The Windows build is
+compiled and unit-tested automatically but hasn't been tried in a DAW yet.)
+
+### Build from source
 
 1. Install Xcode (or its Command Line Tools) and the build tools:
    ```
@@ -82,7 +99,7 @@ make check      # test + validate
 The first build downloads JUCE and Catch2. CI builds and tests on macOS (unit tests, pluginval, auval) and
 Windows (unit tests) on every push.
 
-**Releases:** pushing a version tag (`git tag v0.3.0 && git push --tags`) builds a universal macOS AU + VST3 and a
+**Releases:** pushing a version tag (`git tag v0.4.0 && git push --tags`) builds a universal macOS AU + VST3 and a
 Windows VST3 and attaches them to a draft GitHub release. The macOS builds aren't notarized yet, so macOS will
 block them on other machines until they are.
 
@@ -92,3 +109,9 @@ Contour is young and actively developed: tested in Logic Pro on macOS. Bug repor
 [Issues](https://github.com/matiasconcha11/contour/issues).
 
 See also **[Duck](https://github.com/matiasconcha11/duck)**, a one-knob sidechain plugin.
+
+## License
+
+Contour is free software under the [GNU Affero General Public License v3.0](LICENSE): you can use, study, change and
+share it, as long as anything you distribute that's built on it is released under the same license.
+It's built on [JUCE](https://juce.com), which is used here under the same AGPLv3 terms.
