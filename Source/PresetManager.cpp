@@ -144,8 +144,13 @@ PresetManager::PresetManager (ContourProcessor& p, juce::File directory)
 
 juce::File PresetManager::defaultUserDirectory()
 {
-    const auto standard = juce::File::getSpecialLocation (juce::File::userHomeDirectory)
-                              .getChildFile ("Library/Audio/Presets/Matias Concha/Contour");
+    const auto presetsRoot = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Library/Audio/Presets");
+    const auto standard = presetsRoot.getChildFile ("Rhizr/Contour");
+
+    // Presets saved before the Rhizr rename lived under the developer's own name: move them over once.
+    if (const auto legacy = presetsRoot.getChildFile ("Matias Concha/Contour"); legacy.isDirectory() && ! standard.exists())
+        if (standard.getParentDirectory().createDirectory().wasOk())
+            legacy.moveFileTo (standard);
 
     // ~/Library/Audio/Presets may point at an external drive that isn't mounted.
     if (standard.isDirectory() || standard.createDirectory().wasOk())

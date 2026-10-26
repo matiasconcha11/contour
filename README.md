@@ -5,7 +5,7 @@ spirit of ShaperBox: each module (volume, pan, width, filter, drive, crush, time
 plays in sync with your DAW, so pumping sidechains, gates, auto-pans, filter sweeps, tape stops and
 stutters are all a curve away.
 
-AU · VST3 · Standalone — macOS (Windows VST3 builds in CI) — built with [JUCE](https://juce.com)
+AU · VST3 · Standalone — macOS (Windows VST3 builds in CI) — by [Rhizr](https://rhizr.dev/music), built with [JUCE](https://juce.com)
 
 ![Contour](docs/screenshot.png)
 
@@ -45,7 +45,7 @@ The builds aren't notarized by Apple yet, so macOS blocks them at first. Clear t
 ```
 xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Contour.component ~/Library/Audio/Plug-Ins/VST3/Contour.vst3
 ```
-Then restart your DAW and look for **Matias Concha → Contour**.
+Then restart your DAW and look for **Rhizr → Contour**.
 
 **Windows** — unzip and move `Contour.vst3` into `C:\Program Files\Common Files\VST3\`. (The Windows build is
 compiled and unit-tested automatically but hasn't been tried in a DAW yet.)
@@ -65,7 +65,7 @@ compiled and unit-tested automatically but hasn't been tried in a DAW yet.)
    ```
 
 The build installs the plugin into `~/Library/Audio/Plug-Ins/` (AU in `Components`, VST3 in `VST3`).
-Restart your DAW and look for **Matias Concha → Contour**. A standalone app is also built in
+Restart your DAW and look for **Rhizr → Contour**. A standalone app is also built in
 `build/Contour_artefacts/Release/Standalone/`.
 
 ## Using it
@@ -81,7 +81,7 @@ Restart your DAW and look for **Matias Concha → Contour**. A standalone app is
 2. In the **Side Chain** menu at the top of the plugin window, choose the kick track
 3. Adjust **Threshold** until the trigger light flashes on every kick
 
-**Presets** are saved as `.contourpreset` files in `~/Library/Audio/Presets/Matias Concha/Contour/`
+**Presets** are saved as `.contourpreset` files in `~/Library/Audio/Presets/Rhizr/Contour/`
 (or `~/Documents/Contour Presets` if that folder isn't writable). Copy them to another machine to share them.
 
 ## Development
@@ -108,7 +108,7 @@ block them on other machines until they are.
 Contour is young and actively developed: tested in Logic Pro on macOS. Bug reports and ideas are welcome in
 [Issues](https://github.com/matiasconcha11/contour/issues).
 
-See also **[Duck](https://github.com/matiasconcha11/duck)**, a one-knob sidechain plugin.
+More from [Rhizr](https://rhizr.dev/music): **[Duck](https://github.com/matiasconcha11/duck)** (one-knob sidechain) and **[Fracture](https://github.com/matiasconcha11/fracture)** (glitch sequencer).
 
 ## License
 

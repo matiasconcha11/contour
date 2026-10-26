@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.22)
 # -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" for a universal binary.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(Contour VERSION 0.4.0)
+project(Contour VERSION 0.4.1)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,8 +18,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(Contour
-    COMPANY_NAME "Matias Concha"
-    BUNDLE_ID com.matiasconcha.contour
+    COMPANY_NAME "Rhizr"
+    COMPANY_WEBSITE "https://rhizr.dev"
+    BUNDLE_ID dev.rhizr.contour
+    # Kept from before the Rhizr rename: hosts identify the plugin by this code, so changing it
+    # would break existing sessions.
     PLUGIN_MANUFACTURER_CODE Mcon
     PLUGIN_CODE Cntr
     FORMATS AU VST3 Standalone
