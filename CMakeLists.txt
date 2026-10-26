@@ -46,3 +46,39 @@ target_link_libraries(Contour
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+option(CONTOUR_BUILD_TESTS "Build the unit tests" ON)
+
+if(CONTOUR_BUILD_TESTS)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.16.1
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(Catch2)
+
+    # The tests compile the same sources as the plugin, without a plugin wrapper around them.
+    add_executable(ContourTests
+        Source/Curve.cpp
+        Source/CurveEditor.cpp
+        Source/PluginProcessor.cpp
+        Source/PluginEditor.cpp
+        Tests/CurveTests.cpp
+        Tests/ProcessorTests.cpp)
+
+    target_link_libraries(ContourTests PRIVATE
+        juce::juce_audio_utils
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+        Catch2::Catch2WithMain)
+
+    target_include_directories(ContourTests PRIVATE Source)
+    target_compile_definitions(ContourTests PRIVATE
+        JUCE_STANDALONE_APPLICATION=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0)
+
+    include(CTest)
+    include(${catch2_SOURCE_DIR}/extras/Catch.cmake)
+    catch_discover_tests(ContourTests)
+endif()
