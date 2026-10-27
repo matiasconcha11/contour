@@ -190,6 +190,9 @@ ContourEditor::ContourEditor (ContourProcessor& p)
     bypassButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffff6b6b));
     bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (processor.apvts, Params::bypass, bypassButton);
     addAndMakeVisible (bypassButton);
+    captureButton.onClick = [this] { setCaptureMode (! captureMode); };
+    captureButton.setTooltip ("Show a curve-focused layout for recording. Click Edit to return.");
+    addAndMakeVisible (captureButton);
 
     // Module list.
     moduleStrip.onSelect = [this] (int m) { selectModule (m); };
@@ -298,12 +301,55 @@ void ContourEditor::selectModule (int module)
     resonance.slider.setColour (juce::Slider::rotarySliderFillColourId, accent);
 
     const auto isFilter = module == Params::filter;
-    resonance.slider.setVisible (isFilter);
-    resonance.label.setVisible (isFilter);
-    filterTypeBox.setVisible (isFilter);
+    resonance.slider.setVisible (! captureMode && isFilter);
+    resonance.label.setVisible (! captureMode && isFilter);
+    filterTypeBox.setVisible (! captureMode && isFilter);
 
     for (auto* button : { &shapesButton, &invertButton, &reverseButton, &copyButton, &pasteButton, &clearButton })
         button->setColour (juce::TextButton::buttonOnColourId, accent);
+
+    resized();
+    repaint();
+}
+
+void ContourEditor::setCaptureMode (bool enabled)
+{
+    if (captureMode == enabled)
+        return;
+
+    if (enabled)
+        editSize = { getWidth(), getHeight() };
+
+    captureMode = enabled;
+    captureButton.setButtonText (enabled ? "Edit" : "Capture");
+    setResizable (true, ! enabled);
+
+    const std::initializer_list<juce::Component*> editControls {
+        &prevButton, &presetButton, &nextButton, &saveButton, &bypassButton, &moduleStrip,
+        &shapesButton, &invertButton, &reverseButton, &copyButton, &pasteButton, &clearButton,
+        &undoButton, &redoButton, &gridBox, &modeSelector, &sourceSelector, &filterTypeBox, &meter
+    };
+    for (auto* component : editControls)
+        component->setVisible (! enabled);
+
+    for (auto* knob : { &rate, &rateHz, &offset, &smooth, &threshold, &depth, &resonance, &input, &mix, &output })
+    {
+        knob->slider.setVisible (! enabled);
+        knob->label.setVisible (! enabled);
+    }
+
+    if (enabled)
+    {
+        setResizeLimits (420, 640, 1900, 1900);
+        setSize (720, 1280);
+    }
+    else
+    {
+        setResizeLimits (920, 620, 1900, 1300);
+        setSize (editSize.x, editSize.y);
+        selectModule (currentModule);
+        timerCallback();
+    }
 
     resized();
     repaint();
@@ -527,9 +573,37 @@ void ContourEditor::paint (juce::Graphics& g)
     g.setColour (Theme::text);
     g.setFont (Theme::caps (18.0f).withExtraKerningFactor (0.3f));
     g.drawText ("CONTOUR", logoText, juce::Justification::centredLeft);
-    g.setColour (Theme::faint);
-    g.setFont (Theme::font (11.0f));
-    g.drawText ("v" CONTOUR_VERSION, logoText.withTrimmedLeft (128), juce::Justification::centredLeft);
+    if (captureMode || getWidth() > 1200)
+    {
+        g.setColour (Theme::faint);
+        g.setFont (Theme::font (11.0f));
+        g.drawText ("v" CONTOUR_VERSION, logoText.withTrimmedLeft (128), juce::Justification::centredLeft);
+    }
+
+    if (captureMode)
+    {
+        const auto accent = Theme::modules[currentModule];
+        const auto hero = curveEditor.getBounds();
+        auto title = juce::Rectangle<int> (hero.getX(), hero.getY() - 92, hero.getWidth(), 72);
+        g.setColour (accent);
+        g.setFont (Theme::caps (12.0f));
+        g.drawText ("LIVE CURVE  /  " + Params::moduleNames[currentModule].toUpperCase(),
+                    title.removeFromTop (20), juce::Justification::centredLeft);
+        g.setColour (Theme::text);
+        g.setFont (Theme::font (27.0f, true));
+        g.drawFittedText (processor.presetName, title, juce::Justification::centredLeft, 1);
+
+        auto footer = juce::Rectangle<int> (hero.getX(), hero.getBottom() + 20, hero.getWidth(), 60);
+        const auto mode = (int) processor.apvts.getRawParameterValue (Params::mode)->load();
+        auto timing = Params::modeNames()[mode];
+        if (mode == Params::tempoMode)
+            timing += "  /  " + Params::rateNames()[(int) processor.apvts.getRawParameterValue (Params::rate)->load()];
+        g.setColour (Theme::dim);
+        g.setFont (Theme::caps (12.0f));
+        g.drawText (timing.toUpperCase(), footer.removeFromTop (24), juce::Justification::centredLeft);
+        g.drawText ("RHIZR  /  CONTOUR", footer, juce::Justification::centredLeft);
+        return;
+    }
 
     // Controls panel and group captions.
     const auto controls = getLocalBounds().withTop (getHeight() - controlsHeight);
@@ -572,6 +646,21 @@ void ContourEditor::resized()
 
     // Header: logo on the left, preset bar centred, bypass on the right.
     auto header = bounds.removeFromTop (headerHeight).reduced (margin, 12);
+    captureButton.setBounds (header.removeFromRight (captureMode ? 88 : 84));
+
+    if (captureMode)
+    {
+        auto body = bounds.reduced (30, 28);
+        body.removeFromTop (100);
+        body.removeFromBottom (100);
+        const auto aspect = getHeight() > getWidth() ? 1.12f : 0.62f;
+        const auto width = juce::jmax (1, juce::jmin (body.getWidth(), juce::roundToInt ((float) body.getHeight() / aspect)));
+        curveEditor.setBounds (juce::Rectangle<int> (width, juce::roundToInt ((float) width * aspect))
+                                   .withCentre (body.getCentre()));
+        return;
+    }
+
+    header.removeFromRight (8);
     bypassButton.setBounds (header.removeFromRight (80));
 
     auto presetBar = header.withSizeKeepingCentre (juce::jmin (440, header.getWidth() - 360), header.getHeight());
@@ -674,10 +763,10 @@ void ContourEditor::timerCallback()
 
     const auto mode = (int) processor.apvts.getRawParameterValue (Params::mode)->load();
     const auto hz = mode == Params::hzMode;
-    rate.slider.setVisible (! hz);
-    rate.label.setVisible (! hz);
-    rateHz.slider.setVisible (hz);
-    rateHz.label.setVisible (hz);
+    rate.slider.setVisible (! captureMode && ! hz);
+    rate.label.setVisible (! captureMode && ! hz);
+    rateHz.slider.setVisible (! captureMode && hz);
+    rateHz.label.setVisible (! captureMode && hz);
     const auto audioMode = mode == Params::audioMode;
     threshold.slider.setEnabled (audioMode);
     threshold.label.setAlpha (audioMode ? 1.0f : 0.4f);
@@ -707,7 +796,11 @@ void ContourEditor::timerCallback()
 
     // Thumbnails change with edits, presets and undo; a few repaints a second is plenty.
     if (++frameCount % 6 == 0)
+    {
         moduleStrip.repaint();
+        if (captureMode)
+            repaint();
+    }
 
     refreshPresetLabel();
 }

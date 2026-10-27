@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <juce_audio_formats/juce_audio_formats.h>
 
 #include "PresetManager.h"
 
@@ -14,7 +15,7 @@ namespace
         juce::File getFile() const { return file; }
 
         juce::File file = juce::File::getSpecialLocation (juce::File::tempDirectory)
-                              .getNonexistentChildFile ("ContourPresetTests", {}, false);
+                              .getChildFile ("ContourPresetTests-" + juce::Uuid().toString());
     };
 
     struct Fixture
@@ -165,13 +166,26 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
     processor.setRateAndBufferSizeDetails (48000.0, 512);
     processor.prepareToPlay (48000.0, 512);
 
-    // Feed a decaying pulse per beat so the waveform display has something to show.
+    // A supplied album WAV makes release captures show the plugin on Matías's music.
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> input;
+    if (const auto path = juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_INPUT", {}); path.isNotEmpty())
+    {
+        input.reset (formats.createReaderFor (juce::File (path)));
+        REQUIRE (input != nullptr);
+        REQUIRE_THAT (input->sampleRate, WithinAbs (48000.0, 0.01));
+        REQUIRE (input->numChannels == 2);
+    }
+
     juce::AudioBuffer<float> buffer (2, 512);
     juce::MidiBuffer midi;
 
     for (int block = 0; block < 60; ++block)
     {
-        for (int i = 0; i < 512; ++i)
+        if (input != nullptr)
+            REQUIRE (input->read (&buffer, 0, 512, (juce::int64) block * 512, true, true));
+        else for (int i = 0; i < 512; ++i)
         {
             const auto t = std::fmod ((block * 512 + i) / 24000.0, 1.0);
             const auto v = (float) (0.8 * std::exp (-t * 3.0) * std::sin ((block * 512 + i) * 0.05));
@@ -187,7 +201,31 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
     presets.load (juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_PRESET", "0").getIntValue());
 
     std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
-    editor->setSize (1060, 700);
+    const auto capture = juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_MODE", "") == "capture";
+    if (capture)
+    {
+        juce::TextButton* captureButton = nullptr;
+        for (auto* child : editor->getChildren())
+            if (auto* button = dynamic_cast<juce::TextButton*> (child))
+                if (button->getButtonText() == "Capture")
+                    captureButton = button;
+
+        REQUIRE (captureButton != nullptr);
+        captureButton->onClick();
+        CHECK (captureButton->getButtonText() == "Edit");
+        CHECK (editor->getWidth() == 720);
+        CHECK (editor->getHeight() == 1280);
+        captureButton->onClick();
+        CHECK (captureButton->getButtonText() == "Capture");
+        CHECK (editor->getWidth() == 1060);
+        CHECK (editor->getHeight() == 700);
+        captureButton->onClick();
+    }
+
+    const auto defaultWidth = capture ? "720" : "1060";
+    const auto defaultHeight = capture ? "1280" : "700";
+    editor->setSize (juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_WIDTH", defaultWidth).getIntValue(),
+                     juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT_HEIGHT", defaultHeight).getIntValue());
 
     const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 2.0f);
     const auto path = juce::SystemStats::getEnvironmentVariable ("CONTOUR_SNAPSHOT", "/tmp/contour.png");

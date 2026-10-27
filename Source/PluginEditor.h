@@ -72,6 +72,7 @@ private:
     void savePresetAs();
     void refreshPresetLabel();
     void showShapesMenu();
+    void setCaptureMode (bool);
 
     ContourProcessor& processor;
     PresetManager presets;
@@ -84,6 +85,7 @@ private:
     // Header
     juce::TextButton prevButton { "<" }, presetButton, nextButton { ">" }, saveButton { "Save" };
     juce::TextButton bypassButton { "Bypass" };
+    juce::TextButton captureButton { "Capture" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
     // Modules and curve
@@ -113,6 +115,8 @@ private:
     int lastTriggerCount = 0;
     int frameCount = 0;
     float triggerFlash = 0.0f;
+    bool captureMode = false;
+    juce::Point<int> editSize { 1060, 700 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ContourEditor)
 };

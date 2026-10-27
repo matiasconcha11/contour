@@ -9,6 +9,9 @@ AU · VST3 · Standalone — macOS (Windows VST3 builds in CI) — by [Rhizr](ht
 
 ![Contour](docs/screenshot.png)
 
+The [capture layout](docs/capture.png) centres the live curve in a portrait window for a reel; **Edit** returns to
+the full controls. Capture is a view choice and does not change the sound or saved session.
+
 ## Features
 
 - **Seven modules**, each with its own curve, on/off switch and depth, stacked in one plugin:
@@ -28,6 +31,7 @@ AU · VST3 · Standalone — macOS (Windows VST3 builds in CI) — by [Rhizr](ht
 - **Curve editor** with grid snapping, bendable segments, shapes, invert, reverse, copy/paste between modules
   and instances, and undo/redo
 - **Waveform display** of the audio behind the curve, before and after processing
+- **Capture layout** for filming the selected module's live curve in portrait format
 - **Output section** — input gain, dry/wet mix, output gain with meter, click-free bypass
 - **Presets** — 24 factory presets in categories, plus your own saved as files you can share
 
@@ -94,10 +98,14 @@ make validate   # pluginval at strictness 10 on the VST3 and AU
 make check      # test + validate
 
 ./build/ContourTests "[.snapshot]"   # render the editor to /tmp/contour.png (CONTOUR_SNAPSHOT_PRESET=n for a preset)
+CONTOUR_SNAPSHOT_MODE=capture ./build/ContourTests "[.snapshot]"  # portrait capture
+CONTOUR_ALBUM_INPUT=/path/to/stereo.wav CONTOUR_ALBUM_OUTPUT=/tmp/print.wav ./build/ContourTests "[.album]"
 ```
 
 The first build downloads JUCE and Catch2. CI builds and tests on macOS (unit tests, pluginval, auval) and
 Windows (unit tests) on every push.
+
+[Sound quality baseline and release gate](docs/audio-quality.md).
 
 **Releases:** pushing a version tag (`git tag v0.4.0 && git push --tags`) builds a universal macOS AU + VST3 and a
 Windows VST3 and attaches them to a draft GitHub release. The macOS builds aren't notarized yet, so macOS will

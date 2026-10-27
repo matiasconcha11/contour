@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <juce_audio_formats/juce_audio_formats.h>
+#include <chrono>
+#include <iostream>
 
 #include "PluginProcessor.h"
 
@@ -240,4 +243,81 @@ TEST_CASE_METHOD (Fixture, "Garbage state is ignored", "[processor]")
     processor.setStateInformation (junk, (int) sizeof (junk));
 
     CHECK (processor.curves[Params::volume].getPoints().size() >= 2);
+}
+
+// Manual album comparison: use one level-matched WAV for dry, Drive and Crush.
+// CONTOUR_ALBUM_INPUT=/path/to/48k.wav CONTOUR_ALBUM_MODE=drive CONTOUR_ALBUM_DEPTH=0.35
+// CONTOUR_ALBUM_BLOCK=64 CONTOUR_ALBUM_OUTPUT=/tmp/drive.wav ./build/ContourTests "[.album]"
+TEST_CASE ("Render an album excerpt and measure processing cost", "[.album]")
+{
+    const auto inputPath = juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_INPUT", {});
+    const auto outputPath = juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_OUTPUT", {});
+    REQUIRE (inputPath.isNotEmpty());
+    REQUIRE (outputPath.isNotEmpty());
+
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File (inputPath)));
+    REQUIRE (reader != nullptr);
+    REQUIRE (reader->numChannels == 2);
+
+    const auto mode = juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_MODE", "dry");
+    REQUIRE ((mode == "dry" || mode == "drive" || mode == "crush"));
+    const auto depth = juce::jlimit (0.0f, 1.0f,
+        juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_DEPTH", "0.35").getFloatValue());
+    const auto block = juce::jlimit (32, 2048,
+        juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_BLOCK", "512").getIntValue());
+    const auto seconds = juce::jlimit (1, 60,
+        juce::SystemStats::getEnvironmentVariable ("CONTOUR_ALBUM_SECONDS", "12").getIntValue());
+    const auto frames = juce::jmin ((juce::int64) (seconds * reader->sampleRate), reader->lengthInSamples);
+
+    ContourProcessor processor;
+    for (int module = 0; module < Params::numModules; ++module)
+        setParam (processor, Params::onId (module), 0.0f);
+    setParam (processor, Params::smooth, 0.0f);
+    setParam (processor, Params::bypass, mode == "dry" ? 1.0f : 0.0f);
+
+    if (mode != "dry")
+    {
+        const auto module = mode == "drive" ? Params::drive : Params::crush;
+        processor.curves[(size_t) module].setPoints ({ { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } });
+        setParam (processor, Params::onId (module), 1.0f);
+        setParam (processor, Params::depthId (module), depth);
+    }
+
+    processor.setRateAndBufferSizeDetails (reader->sampleRate, block);
+    processor.prepareToPlay (reader->sampleRate, block);
+    juce::AudioBuffer<float> buffer (2, block);
+    juce::MidiBuffer midi;
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::OutputStream> stream = juce::File (outputPath).createOutputStream();
+    REQUIRE (stream != nullptr);
+    auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions()
+        .withSampleRate (reader->sampleRate).withNumChannels (2).withBitsPerSample (32)
+        .withSampleFormat (juce::AudioFormatWriterOptions::SampleFormat::floatingPoint));
+    REQUIRE (writer != nullptr);
+
+    double processingSeconds = 0.0;
+    double worstBlockMs = 0.0;
+    float peak = 0.0f;
+
+    for (juce::int64 frame = 0; frame < frames; frame += block)
+    {
+        const auto count = (int) juce::jmin ((juce::int64) block, frames - frame);
+        REQUIRE (reader->read (&buffer, 0, count, frame, true, true));
+        if (count < block)
+            buffer.clear (count, block - count);
+
+        const auto started = std::chrono::steady_clock::now();
+        processor.processBlock (buffer, midi);
+        const auto elapsed = std::chrono::duration<double> (std::chrono::steady_clock::now() - started).count();
+        processingSeconds += elapsed;
+        worstBlockMs = juce::jmax (worstBlockMs, elapsed * 1000.0);
+        peak = juce::jmax (peak, buffer.getMagnitude (0, 0, count), buffer.getMagnitude (1, 0, count));
+        REQUIRE (writer->writeFromAudioSampleBuffer (buffer, 0, count));
+    }
+
+    std::cout << "Contour " << mode << " depth=" << depth << " sampleRate=" << reader->sampleRate
+              << " block=" << block << " cpuRatio=" << processingSeconds * reader->sampleRate / (double) frames
+              << " worstBlockMs=" << worstBlockMs << " peak=" << peak << std::endl;
 }
