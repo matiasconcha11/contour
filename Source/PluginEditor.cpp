@@ -414,7 +414,7 @@ bool ContourEditor::keyPressed (const juce::KeyPress& key)
 //==============================================================================
 void ContourEditor::refreshPresetLabel()
 {
-    const auto text = processor.presetName + (processor.isPresetDirty() ? " *" : "");
+    const auto text = processor.getPresetName() + (processor.isPresetDirty() ? " *" : "");
 
     if (presetButton.getButtonText() != text)
         presetButton.setButtonText (text);
@@ -475,7 +475,7 @@ void ContourEditor::showPresetMenu()
     menu.addSeparator();
     menu.addItem (saveId, "Save");
     menu.addItem (saveAsId, "Save As...");
-    menu.addItem (deleteId, "Delete \"" + processor.presetName + "\"...", presets.isCurrentUserPreset());
+    menu.addItem (deleteId, "Delete \"" + processor.getPresetName() + "\"...", presets.isCurrentUserPreset());
     menu.addSeparator();
     menu.addItem (initId, "Reset to Init");
     menu.addItem (revealId, "Show Presets Folder");
@@ -496,7 +496,7 @@ void ContourEditor::showPresetMenu()
                                     presets.getUserDirectory().revealToUser();
                                     break;
                                 case deleteId:
-                                    dialog.showConfirm ("Delete \"" + processor.presetName + "\"?", "Delete",
+                                    dialog.showConfirm ("Delete \"" + processor.getPresetName() + "\"?", "Delete",
                                                         [this, current] { presets.remove (current); refreshPresetLabel(); });
                                     break;
                                 default:
@@ -512,7 +512,7 @@ void ContourEditor::savePreset()
     // Saving over a factory preset isn't allowed, so that becomes Save As.
     if (presets.isCurrentUserPreset())
     {
-        presets.save (processor.presetName);
+        presets.save (processor.getPresetName());
         refreshPresetLabel();
     }
     else
@@ -523,7 +523,7 @@ void ContourEditor::savePreset()
 
 void ContourEditor::savePresetAs()
 {
-    const auto suggestion = presets.isCurrentUserPreset() ? processor.presetName : processor.presetName + " (copy)";
+    const auto suggestion = presets.isCurrentUserPreset() ? processor.getPresetName() : processor.getPresetName() + " (copy)";
 
     dialog.showPrompt ("Save preset", suggestion, "Save", [this] (const juce::String& name)
     {
@@ -561,13 +561,15 @@ void ContourEditor::paint (juce::Graphics& g)
     g.setColour (Theme::outline);
     g.drawHorizontalLine (headerHeight - 1, 0.0f, (float) getWidth());
 
-    const auto mark = juce::Rectangle<float> ((float) margin, 16.0f, 26.0f, 24.0f);
+    const auto mark = juce::Rectangle<float> ((float) margin, 15.0f, 26.0f, 26.0f);
     juce::Path logo;
-    logo.startNewSubPath (mark.getX(), mark.getBottom());
-    logo.cubicTo (mark.getX() + 6.0f, mark.getY() - 4.0f, mark.getX() + 10.0f, mark.getY(), mark.getCentreX(), mark.getCentreY());
-    logo.cubicTo (mark.getX() + 16.0f, mark.getBottom(), mark.getRight() - 4.0f, mark.getBottom(), mark.getRight(), mark.getY());
-    g.setGradientFill (juce::ColourGradient (Theme::modules[0], mark.getTopLeft(), Theme::modules[6], mark.getBottomRight(), false));
-    g.strokePath (logo, juce::PathStrokeType (2.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    logo.startNewSubPath (18.0f, 54.0f);
+    logo.lineTo (18.0f, 47.0f);
+    logo.cubicTo (18.0f, 38.0f, 27.0f, 40.0f, 31.0f, 35.0f);
+    logo.cubicTo (37.0f, 29.0f, 34.0f, 20.0f, 47.0f, 15.0f);
+    logo.applyTransform (juce::AffineTransform::scale (mark.getWidth() / 64.0f, mark.getHeight() / 64.0f).translated (mark.getX(), mark.getY()));
+    g.setColour (juce::Colour (0xff79b4a5));
+    g.strokePath (logo, juce::PathStrokeType (2.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     auto logoText = header.withTrimmedLeft (margin + 36);
     g.setColour (Theme::text);
@@ -591,7 +593,7 @@ void ContourEditor::paint (juce::Graphics& g)
                     title.removeFromTop (20), juce::Justification::centredLeft);
         g.setColour (Theme::text);
         g.setFont (Theme::font (27.0f, true));
-        g.drawFittedText (processor.presetName, title, juce::Justification::centredLeft, 1);
+        g.drawFittedText (processor.getPresetName(), title, juce::Justification::centredLeft, 1);
 
         auto footer = juce::Rectangle<int> (hero.getX(), hero.getBottom() + 20, hero.getWidth(), 60);
         const auto mode = (int) processor.apvts.getRawParameterValue (Params::mode)->load();
