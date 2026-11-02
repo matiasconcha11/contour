@@ -4,6 +4,7 @@
 #include "PluginProcessor.h"
 
 #include <cmath>
+#include <thread>
 
 using Catch::Matchers::WithinAbs;
 
@@ -229,6 +230,29 @@ TEST_CASE_METHOD (Fixture, "Sessions from version 0.2 keep their sync setting", 
     processor.setStateInformation (data.getData(), (int) data.getSize());
 
     CHECK ((int) processor.apvts.getRawParameterValue (Params::mode)->load() == Params::hzMode);
+}
+
+TEST_CASE_METHOD (Fixture, "Host-thread restore makes curves available before it returns", "[processor][state]")
+{
+    processor.curves[Params::volume].setPoints ({ { 0.0f, 0.2f, 0.0f }, { 0.5f, 0.8f, 0.0f }, { 1.0f, 0.2f, 0.0f } });
+    processor.setPresetName ("Recall test");
+
+    juce::MemoryBlock saved;
+    processor.getStateInformation (saved);
+    processor.curves[Params::volume].setPoints ({ { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } });
+    processor.setPresetName ("Changed");
+
+    std::thread host ([&] { processor.setStateInformation (saved.getData(), (int) saved.getSize()); });
+    host.join();
+
+    CHECK_THAT (processor.curves[Params::volume].evaluate (0.5f), WithinAbs (0.8f, 1.0e-4));
+    CHECK_THAT (processor.curves[Params::volume].lookup (0.5f), WithinAbs (0.8f, 1.0e-4));
+    CHECK (processor.getPresetName() == "Recall test");
+
+    auto restored = processor.getStateTree();
+    auto curves = restored.getChildWithName ("CURVES");
+    REQUIRE (curves.isValid());
+    CHECK_THAT ((float) curves.getChild (0).getChild (1).getProperty ("y"), WithinAbs (0.8f, 1.0e-4));
 }
 
 TEST_CASE_METHOD (Fixture, "Bar rates start on bar lines after a time-signature change", "[transport]")

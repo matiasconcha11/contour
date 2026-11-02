@@ -44,7 +44,7 @@ TEST_CASE_METHOD (Fixture, "Every factory preset loads cleanly", "[presets]")
     for (int i = 0; i < PresetManager::numFactoryPresets(); ++i)
     {
         REQUIRE (presets.load (i));
-        CHECK (processor.presetName == presets.getPresets()[(size_t) i].name);
+        CHECK (processor.getPresetName() == presets.getPresets()[(size_t) i].name);
         CHECK_FALSE (processor.isPresetDirty());
         CHECK (presets.getCurrentIndex() == i);
     }
@@ -91,7 +91,7 @@ TEST_CASE_METHOD (Fixture, "User presets save and load back exactly", "[presets]
 
     REQUIRE (presets.save ("My Pan"));
     CHECK (directory.getFile().getChildFile ("My Pan.contourpreset").existsAsFile());
-    CHECK (processor.presetName == "My Pan");
+    CHECK (processor.getPresetName() == "My Pan");
     CHECK_FALSE (processor.isPresetDirty());
     CHECK (presets.isCurrentUserPreset());
 
@@ -101,7 +101,7 @@ TEST_CASE_METHOD (Fixture, "User presets save and load back exactly", "[presets]
     const auto index = presets.getCurrentIndex() >= 0 ? (int) presets.getPresets().size() - 1 : -1;
     REQUIRE (presets.load (index));
 
-    CHECK (processor.presetName == "My Pan");
+    CHECK (processor.getPresetName() == "My Pan");
     CHECK (param (Params::onId (Params::pan)) > 0.5f);
     CHECK_THAT (param (Params::mix), WithinAbs (0.6f, 1.0e-4));
     CHECK_FALSE (processor.isPresetDirty());

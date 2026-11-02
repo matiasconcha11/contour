@@ -401,6 +401,7 @@ void ContourProcessor::curveChanged()
 juce::ValueTree ContourProcessor::getStateTree()
 {
     auto state = apvts.copyState();
+    state.setProperty ("schemaVersion", 1, nullptr);
     state.removeChild (state.getChildWithName ("CURVES"), nullptr);
 
     juce::ValueTree curveTrees ("CURVES");
@@ -413,7 +414,7 @@ juce::ValueTree ContourProcessor::getStateTree()
     }
 
     state.appendChild (curveTrees, nullptr);
-    state.setProperty ("presetName", presetName, nullptr);
+    state.setProperty ("presetName", getPresetName(), nullptr);
     state.setProperty ("presetDirty", isPresetDirty(), nullptr);
     return state;
 }
@@ -423,6 +424,7 @@ void ContourProcessor::applyParameterState (const juce::ValueTree& source)
     auto state = source.createCopy();
     state.removeChild (state.getChildWithName ("CURVES"), nullptr);
     state.removeChild (state.getChildWithName ("CURVE"), nullptr);
+    state.removeProperty ("schemaVersion", nullptr);
 
     // 0.2 had a Sync switch where 0.3 has Mode (Tempo / Hz / Audio).
     const auto sync = state.getChildWithProperty ("id", "sync");
@@ -461,7 +463,7 @@ void ContourProcessor::applyCurveState (const juce::ValueTree& state)
         curves[Params::volume].fromValueTree (legacy);
     }
 
-    presetName = state.getProperty ("presetName", "Init").toString();
+    setPresetName (state.getProperty ("presetName", "Init").toString());
 }
 
 void ContourProcessor::setStateTree (const juce::ValueTree& state)
@@ -491,23 +493,23 @@ void ContourProcessor::setStateInformation (const void* data, int sizeInBytes)
     // Parameters must be restored before this returns, whichever thread the host calls from.
     applyParameterState (state);
 
-    // Curves and the preset name are owned by the message thread.
-    const auto applyCurves = [this, state]
-    {
-        applyCurveState (state);
-
-        if (auto* ed = dynamic_cast<ContourEditor*> (getActiveEditor()))
-            ed->stateReloaded();
-    };
+    // The sound must be restored before the host can process or save this instance again.
+    applyCurveState (state);
 
     if (juce::MessageManager::existsAndIsCurrentThread())
-        applyCurves();
+    {
+        if (auto* ed = dynamic_cast<ContourEditor*> (getActiveEditor()))
+            ed->stateReloaded();
+    }
     else
-        juce::MessageManager::callAsync ([weakThis = juce::WeakReference<ContourProcessor> (this), applyCurves]
+    {
+        juce::MessageManager::callAsync ([weakThis = juce::WeakReference<ContourProcessor> (this)]
         {
             if (weakThis != nullptr)
-                applyCurves();
+                if (auto* ed = dynamic_cast<ContourEditor*> (weakThis->getActiveEditor()))
+                    ed->stateReloaded();
         });
+    }
 }
 
 juce::AudioProcessorEditor* ContourProcessor::createEditor()

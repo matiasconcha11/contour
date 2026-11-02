@@ -39,8 +39,8 @@ public:
 
     Curve();
 
-    // Message thread only.
-    const std::vector<CurvePoint>& getPoints() const { return points; }
+    // Host state restoration may arrive off the message thread.
+    std::vector<CurvePoint> getPoints() const;
     void setPoints (std::vector<CurvePoint> newPoints);
     float evaluate (float x) const; // exact evaluation, used for drawing
 
@@ -62,7 +62,9 @@ public:
 private:
     void sanitise();
     void rebuildTable();
+    float evaluateUnlocked (float x) const;
 
+    mutable juce::CriticalSection pointsLock;
     std::vector<CurvePoint> points;
     std::array<std::atomic<float>, tableSize + 1> table;
 };

@@ -192,7 +192,7 @@ void PresetManager::applyFactory (int index)
 
     PresetBuilder builder { processor };
     factoryPresets()[(size_t) index].build (builder);
-    processor.presetName = factoryPresets()[(size_t) index].name;
+    processor.setPresetName (factoryPresets()[(size_t) index].name);
 }
 
 bool PresetManager::load (int index)
@@ -258,7 +258,7 @@ bool PresetManager::save (const juce::String& requestedName)
     if (name.isEmpty() || ! (userDirectory.isDirectory() || userDirectory.createDirectory().wasOk()))
         return false;
 
-    processor.presetName = name;
+    processor.setPresetName (name);
     auto state = processor.getStateTree();
     state.setProperty ("presetDirty", false, nullptr);
 
@@ -295,7 +295,7 @@ bool PresetManager::remove (int index)
 int PresetManager::getCurrentIndex() const
 {
     for (size_t i = presets.size(); i-- > 0;) // user presets win over a factory one with the same name
-        if (presets[i].name == processor.presetName)
+        if (presets[i].name == processor.getPresetName())
             return (int) i;
 
     return -1;

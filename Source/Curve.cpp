@@ -20,6 +20,7 @@ Curve::Curve()
 
 void Curve::setPoints (std::vector<CurvePoint> newPoints)
 {
+    const juce::ScopedLock lock (pointsLock);
     points = std::move (newPoints);
     sanitise();
     rebuildTable();
@@ -46,7 +47,19 @@ void Curve::sanitise()
     points.back().y = points.front().y;
 }
 
+std::vector<CurvePoint> Curve::getPoints() const
+{
+    const juce::ScopedLock lock (pointsLock);
+    return points;
+}
+
 float Curve::evaluate (float x) const
+{
+    const juce::ScopedLock lock (pointsLock);
+    return evaluateUnlocked (x);
+}
+
+float Curve::evaluateUnlocked (float x) const
 {
     x = std::clamp (x, 0.0f, 1.0f);
 
@@ -69,7 +82,7 @@ float Curve::evaluate (float x) const
 void Curve::rebuildTable()
 {
     for (int i = 0; i <= tableSize; ++i)
-        table[(size_t) i].store (evaluate ((float) i / (float) tableSize), std::memory_order_relaxed);
+        table[(size_t) i].store (evaluateUnlocked ((float) i / (float) tableSize), std::memory_order_relaxed);
 }
 
 float Curve::lookup (float phase) const noexcept
@@ -84,6 +97,7 @@ float Curve::lookup (float phase) const noexcept
 
 juce::ValueTree Curve::toValueTree() const
 {
+    const juce::ScopedLock lock (pointsLock);
     juce::ValueTree tree ("CURVE");
 
     for (const auto& p : points)
@@ -115,6 +129,7 @@ void Curve::fromValueTree (const juce::ValueTree& tree)
 
 void Curve::invert()
 {
+    const juce::ScopedLock lock (pointsLock);
     for (auto& p : points)
         p.y = 1.0f - p.y;
 
@@ -123,6 +138,7 @@ void Curve::invert()
 
 void Curve::reverse()
 {
+    const juce::ScopedLock lock (pointsLock);
     // Walking a segment backwards bends it the other way.
     std::vector<CurvePoint> reversed;
 

@@ -37,15 +37,15 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // Full state (parameters + curves + preset name) as a tree. Message thread only.
+    // Full state (parameters + curves + preset name) as a tree.
     juce::ValueTree getStateTree();
     void setStateTree (const juce::ValueTree& state);
 
     // Message thread: call after editing a curve so the host and preset bar know.
     void curveChanged();
 
-    // Preset bookkeeping, owned by the message thread.
-    juce::String presetName { "Init" };
+    juce::String getPresetName() const { const juce::ScopedLock lock (presetNameLock); return presetName; }
+    void setPresetName (const juce::String& name) { const juce::ScopedLock lock (presetNameLock); presetName = name; }
     bool isPresetDirty() const { return presetDirty.load(); }
     void markPresetClean() { presetDirty = false; }
 
@@ -72,6 +72,8 @@ public:
     std::atomic<bool> sidechainConnected { false };
 
 private:
+    mutable juce::CriticalSection presetNameLock;
+    juce::String presetName { "Init" };
     void applyParameterState (const juce::ValueTree&);
     void applyCurveState (const juce::ValueTree&);
 

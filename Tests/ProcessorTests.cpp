@@ -8,6 +8,26 @@
 
 using Catch::Matchers::WithinAbs;
 
+TEST_CASE ("Published parameter IDs and AU version hints stay stable", "[compatibility]")
+{
+    ContourProcessor processor;
+    const juce::StringArray expected {
+        "mode", "rate", "rateHz", "threshold", "triggerSource", "offset", "smooth",
+        "volumeOn", "volumeDepth", "panOn", "panDepth", "widthOn", "widthDepth", "filterOn", "filterDepth",
+        "driveOn", "driveDepth", "crushOn", "crushDepth", "timeOn", "timeDepth",
+        "filterType", "filterResonance", "inputGain", "mix", "outputGain", "bypass"
+    };
+    REQUIRE (processor.getParameters().size() == expected.size());
+
+    for (int i = 0; i < expected.size(); ++i)
+    {
+        auto* parameter = dynamic_cast<juce::AudioProcessorParameterWithID*> (processor.getParameters()[i]);
+        REQUIRE (parameter != nullptr);
+        CHECK (parameter->getParameterID() == expected[i]);
+        CHECK (parameter->getVersionHint() == 1);
+    }
+}
+
 namespace
 {
     constexpr double sampleRate = 48000.0;
@@ -192,7 +212,7 @@ TEST_CASE_METHOD (Fixture, "State round trip restores parameters, curves and pre
     processor.curves[Params::width].setPoints (shape);
     setParam (processor, Params::depthId (Params::pan), 0.37f);
     setParam (processor, Params::rate, 6.0f);
-    processor.presetName = "My Groove";
+    processor.setPresetName ("My Groove");
 
     juce::MemoryBlock state;
     processor.getStateInformation (state);
@@ -202,7 +222,7 @@ TEST_CASE_METHOD (Fixture, "State round trip restores parameters, curves and pre
 
     CHECK_THAT (restored.apvts.getRawParameterValue (Params::depthId (Params::pan))->load(), WithinAbs (0.37f, 1.0e-4));
     CHECK (restored.apvts.getRawParameterValue (Params::rate)->load() == 6.0f);
-    CHECK (restored.presetName == "My Groove");
+    CHECK (restored.getPresetName() == "My Groove");
 
     const auto& points = restored.curves[Params::width].getPoints();
     REQUIRE (points.size() == shape.size());
